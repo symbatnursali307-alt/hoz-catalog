@@ -62,7 +62,7 @@ export default function CatalogPage() {
     const q = searchQuery.toLowerCase().trim();
     return products.filter(p => 
       p.name.toLowerCase().includes(q) || 
-      p.category.name.toLowerCase().includes(q) ||
+      (p.category?.name?.toLowerCase().includes(q)) ||
       (p.description && p.description.toLowerCase().includes(q))
     );
   }, [searchQuery, products]);
@@ -120,7 +120,7 @@ export default function CatalogPage() {
       <main id="catalog" className="max-w-[1120px] mx-auto px-4 pt-[18px] pb-5">
         {categories.map((category) => {
           // Filter items for this category
-          const categoryProducts = filteredProducts.filter(p => p.category.id === category.id);
+          const categoryProducts = filteredProducts.filter(p => p.category?.id === category.id);
           
           // Hide category if search yields no results for it
           if (categoryProducts.length === 0) return null;
