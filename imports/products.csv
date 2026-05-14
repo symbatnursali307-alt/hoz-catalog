@@ -1,0 +1,3 @@
+category,subcategory,name,sku,price_without_vat,price_with_vat,unit,description,package_info,image_raw,image_filename,is_active,is_popular,sort_order
+Перчатки,Х/б,Перчатки х/б белые,GLV-001,100,112,пара,"Для склада, стройки, производства","780 пар / мешок",001.jpg,perchatki-hb-belye.webp,true,true,10
+Перчатки,Нейлоновые,Перчатки нейлоновые чёрные,GLV-002,120,134,пара,"Для точных работ, склада и торговли","12 пар / упаковка",002.jpg,perchatki-neylonovye-chernye.webp,true,false,20

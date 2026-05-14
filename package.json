@@ -1,0 +1,23 @@
+{
+  "name": "hoztorg-catalog",
+  "version": "1.0.0",
+  "description": "Catalog import and image processing pipeline",
+  "main": "index.js",
+  "scripts": {
+    "convert:images": "tsx scripts/convert-images.ts",
+    "upload:images": "tsx scripts/upload-images.ts",
+    "import:products": "tsx scripts/import-products.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^25.7.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "prisma": "^6.19.3"
+  }
+}
