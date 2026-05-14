@@ -29,6 +29,7 @@ type ProductRow = {
   is_active?: string;
   is_popular?: string;
   sort_order?: string;
+  [key: string]: any;
 };
 
 function categoryToFolder(category: string) {
@@ -63,6 +64,7 @@ async function uploadImage(row: ProductRow) {
     access: "public",
     contentType: "image/webp",
     addRandomSuffix: false,
+    allowOverwrite: true,
   });
 
   console.log(`✅ Загружено: ${blobPath}`);
@@ -81,6 +83,7 @@ async function main() {
     columns: true,
     skip_empty_lines: true,
     trim: true,
+    bom: true,
   }) as ProductRow[];
 
   const updatedRows: ProductRow[] = [];

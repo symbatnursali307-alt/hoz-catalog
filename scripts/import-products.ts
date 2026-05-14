@@ -28,6 +28,7 @@ type ProductRow = {
   is_active?: string;
   is_popular?: string;
   sort_order?: string;
+  [key: string]: any;
 };
 
 function makeSlug(text: string) {
@@ -136,6 +137,7 @@ async function main() {
     columns: true,
     skip_empty_lines: true,
     trim: true,
+    bom: true,
   }) as ProductRow[];
 
   console.log(`Найдено товаров для импорта: ${rows.length}`);

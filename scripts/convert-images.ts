@@ -17,8 +17,18 @@ type ProductRow = {
   subcategory?: string;
   name: string;
   sku?: string;
-  image_raw: string;
+  price_without_vat?: string;
+  price_with_vat?: string;
+  unit?: string;
+  description?: string;
+  package_info?: string;
+  image_raw?: string;
   image_filename: string;
+  image_url?: string;
+  is_active?: string;
+  is_popular?: string;
+  sort_order?: string;
+  [key: string]: any;
 };
 
 function ensureDir(dir: string) {
@@ -28,7 +38,7 @@ function ensureDir(dir: string) {
 }
 
 async function convertImage(row: ProductRow) {
-  const inputPath = path.join(RAW_DIR, row.image_raw);
+  const inputPath = path.join(RAW_DIR, row.image_raw!);
   const outputPath = path.join(READY_DIR, row.image_filename);
 
   if (!fs.existsSync(inputPath)) {
@@ -68,6 +78,7 @@ async function main() {
     columns: true,
     skip_empty_lines: true,
     trim: true,
+    bom: true,
   }) as ProductRow[];
 
   console.log(`Найдено товаров в CSV: ${rows.length}`);
