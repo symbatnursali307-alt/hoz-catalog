@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     const categorySlug = searchParams.get('category');
 
     const whereClause: any = { isActive: true };
-    if (categorySlug) {
+    if (categorySlug && categorySlug.trim() !== '') {
       whereClause.category = {
         slug: categorySlug
       };
