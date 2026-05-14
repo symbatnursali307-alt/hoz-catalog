@@ -4,6 +4,10 @@
   "description": "Catalog import and image processing pipeline",
   "main": "index.js",
   "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
     "convert:images": "tsx scripts/convert-images.ts",
     "upload:images": "tsx scripts/upload-images.ts",
     "import:products": "tsx scripts/import-products.ts"
@@ -12,17 +16,31 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.0",
     "@types/node": "^25.7.0",
+    "@types/react": "19.2.14",
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8.5.14",
+    "tailwindcss": "^4.3.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "@vercel/blob": "^2.3.3",
+    "clsx": "^2.1.1",
     "csv-parse": "^6.2.1",
     "csv-stringify": "^6.7.0",
     "dotenv": "^17.4.2",
+    "lucide-react": "^1.14.0",
+    "next": "^16.2.6",
     "prisma": "^6.19.3",
-    "sharp": "^0.34.5"
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "sharp": "^0.34.5",
+    "slugify": "^1.6.9",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss-animate": "^1.0.7",
+    "zustand": "^5.0.13"
   }
 }

@@ -1,0 +1,35 @@
+@import "tailwindcss";
+@config "../tailwind.config.ts";
+
+:root {
+  --bg: #f5f6f7;
+  --text: #14181f;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --accent: #16a34a;
+  --accent-dark: #15803d;
+  --dark: #111827;
+  --danger: #dc2626;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  padding-bottom: 92px;
+}
+
+/* Custom Scrollbar for better UI on Desktop */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

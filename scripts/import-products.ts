@@ -3,9 +3,9 @@ import path from "path";
 import dotenv from "dotenv";
 import slugify from "slugify";
 import { parse } from "csv-parse/sync";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from ".prisma/client";
 
-dotenv.config({ path: ".env.local" });
+dotenv.config(); // Загружает .env по умолчанию
 
 const prisma = new PrismaClient();
 

@@ -5,7 +5,7 @@ import { put } from "@vercel/blob";
 import { parse } from "csv-parse/sync";
 import { stringify } from "csv-stringify/sync";
 
-dotenv.config({ path: ".env.local" });
+dotenv.config();
 
 const ROOT = process.cwd();
 
