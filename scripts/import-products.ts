@@ -3,7 +3,7 @@ import path from "path";
 import dotenv from "dotenv";
 import slugify from "slugify";
 import { parse } from "csv-parse/sync";
-import { PrismaClient } from ".prisma/client";
+import { PrismaClient } from "@prisma/client";
 
 dotenv.config(); // Загружает .env по умолчанию
 
@@ -16,12 +16,14 @@ type ProductRow = {
   category: string;
   subcategory?: string;
   name: string;
-  sku?: string;
+  external_id?: string;
   price_without_vat?: string;
   price_with_vat?: string;
   unit?: string;
   description?: string;
-  package_info?: string;
+  package_type?: string;
+  package_quantity?: string;
+  package_unit?: string;
   image_raw?: string;
   image_filename?: string;
   image_url?: string;
@@ -90,31 +92,32 @@ async function importProduct(row: ProductRow, index: number) {
 
   const category = await getOrCreateCategory(row.category);
 
-  const sku = row.sku?.trim() || `AUTO-${index + 1}`;
+  const externalId = row.external_id?.trim() || `AUTO-${index + 1}`;
 
   const data = {
     name: row.name.trim(),
-    sku,
+    externalId,
     categoryId: category.id,
-    subcategory: row.subcategory?.trim() || null,
-
+    
     priceWithoutVat: toNumber(row.price_without_vat),
-    priceWithVat: toNumber(row.price_with_vat),
+    priceWithVat: toNumber(row.price_with_vat) ? parseFloat(String(row.price_with_vat).replace(/[^\d.]/g, '')) : null,
+    price: row.price_without_vat ? `${toNumber(row.price_without_vat)} тг.` : null,
 
     unit: row.unit?.trim() || null,
     description: row.description?.trim() || null,
-    packageInfo: row.package_info?.trim() || null,
+    
+    packageType: row.package_type?.trim() || null,
+    packageQuantity: toNumber(row.package_quantity),
+    packageUnit: row.package_unit?.trim() || null,
 
-    imageFilename: row.image_filename?.trim() || null,
-    imageUrl: row.image_url?.trim() || null,
+    photo: row.image_url?.trim() || null,
 
     isActive: toBoolean(row.is_active, true),
-    isPopular: toBoolean(row.is_popular, false),
     sortOrder: toNumber(row.sort_order) || index + 1,
   };
 
   await prisma.product.upsert({
-    where: { sku },
+    where: { externalId },
     update: data,
     create: data,
   });

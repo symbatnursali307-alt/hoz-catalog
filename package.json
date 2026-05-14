@@ -1,11 +1,12 @@
 {
   "name": "hoztorg-catalog",
   "version": "1.0.0",
+  "type": "module",
   "description": "Catalog import and image processing pipeline",
   "main": "index.js",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "convert:images": "tsx scripts/convert-images.ts",
