@@ -83,3 +83,16 @@ model ClientSelectedProduct {
   createdAt           DateTime @default(now())
 }
 
+model AppSettings {
+  id                 String   @id @default("default")
+
+  companyName        String   @default("Каталог хозтоваров")
+  catalogTitle       String   @default("Каталог хозтоваров")
+  catalogDescription String?
+
+  whatsappPhone      String?
+  showPrices         Boolean  @default(true)
+  showVatPrices      Boolean  @default(true)
+
+  updatedAt          DateTime @updatedAt
+}
