@@ -40,8 +40,20 @@ export async function GET(request: NextRequest) {
     });
     
     return NextResponse.json(products);
-  } catch (error) {
-    console.error('Failed to fetch products:', error);
-    return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 });
+  } catch (error: any) {
+    console.error('API ERROR [/api/products]:', error);
+
+    return NextResponse.json(
+      {
+        error: 'Failed to fetch products',
+        message: error?.message,
+        code: error?.code,
+        name: error?.name,
+        stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined,
+        hasDbUrl: !!process.env.DATABASE_URL,
+        dbUrlPrefix: process.env.DATABASE_URL?.substring(0, 30) + '...',
+      },
+      { status: 500 }
+    );
   }
 }
