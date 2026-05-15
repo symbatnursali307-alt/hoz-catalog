@@ -93,6 +93,12 @@ export default function CatalogPage() {
             >
               Открыть каталог
             </a>
+            <a 
+              className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-extrabold no-underline text-[13px] min-h-[48px] text-white/50 hover:text-white/80 hover:bg-white/5 transition-colors"
+              href="/admin"
+            >
+              Админ-панель
+            </a>
           </div>
         </div>
       </header>
