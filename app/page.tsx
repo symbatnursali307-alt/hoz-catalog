@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useCartStore, Product } from '@/store/cart';
-import { Search, ChevronDown, ChevronUp, ImageIcon } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, ImageIcon, LogIn } from 'lucide-react';
 import ProductModal from '@/components/ProductModal';
 import CartModal from '@/components/CartModal';
 import { formatPrice } from '@/lib/utils';
@@ -77,7 +77,13 @@ export default function CatalogPage() {
 
   return (
     <div className="min-h-screen">
-      <header className="bg-gradient-to-br from-gray-900 to-gray-800 text-white px-4 pt-6 pb-[22px]">
+      <header className="bg-gradient-to-br from-gray-900 to-gray-800 text-white px-4 pt-6 pb-[22px] relative">
+        <div className="absolute top-4 right-4 sm:right-6">
+          <a href="/admin" className="text-white/30 hover:text-white/80 transition-colors flex items-center gap-1.5 text-[13px] font-medium" title="Вход в админ-панель">
+            <LogIn size={16} />
+            <span className="hidden sm:inline">Вход</span>
+          </a>
+        </div>
         <div className="max-w-[1120px] mx-auto">
           <h1 className="m-0 mb-2.5 text-[clamp(26px,6vw,48px)] leading-[1.05] tracking-tight font-bold">
             Каталог хозтоваров
@@ -92,12 +98,6 @@ export default function CatalogPage() {
               href="#catalog"
             >
               Открыть каталог
-            </a>
-            <a 
-              className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-extrabold no-underline text-[13px] min-h-[48px] text-white/50 hover:text-white/80 hover:bg-white/5 transition-colors"
-              href="/admin"
-            >
-              Админ-панель
             </a>
           </div>
         </div>
