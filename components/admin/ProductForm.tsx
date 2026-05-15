@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Save, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
@@ -22,8 +22,11 @@ interface ProductFormProps {
   productId?: string; // If provided, we're editing
 }
 
-export default function ProductForm({ productId }: ProductFormProps) {
+function ProductFormInner({ productId }: ProductFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnTo = searchParams.get('return_to') || '/admin/products';
+  
   const isEditing = !!productId;
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -185,7 +188,9 @@ export default function ProductForm({ productId }: ProductFormProps) {
       setSuccess(isEditing ? 'Товар обновлён' : 'Товар добавлен');
 
       if (!isEditing) {
-        setTimeout(() => router.push('/admin/products'), 1000);
+        setTimeout(() => router.push(returnTo), 1000);
+      } else {
+        setTimeout(() => router.push(returnTo), 1000);
       }
     } catch (err: any) {
       setError(err.message || 'Ошибка сервера');
@@ -204,7 +209,7 @@ export default function ProductForm({ productId }: ProductFormProps) {
   return (
     <div className="max-w-[700px]">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/admin/products" className="text-gray-400 hover:text-gray-600 transition-colors">
+        <Link href={returnTo} className="text-gray-400 hover:text-gray-600 transition-colors">
           <ArrowLeft size={20} />
         </Link>
         <h2 className="text-xl font-bold text-gray-900">
@@ -381,5 +386,13 @@ export default function ProductForm({ productId }: ProductFormProps) {
         </button>
       </form>
     </div>
+  );
+}
+
+export default function ProductForm(props: ProductFormProps) {
+  return (
+    <Suspense fallback={<div className="text-gray-400 font-bold animate-pulse py-20 text-center">Загрузка...</div>}>
+      <ProductFormInner {...props} />
+    </Suspense>
   );
 }

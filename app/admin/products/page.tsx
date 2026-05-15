@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, Suspense } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Search, Eye, EyeOff, Pencil, Package, Plus, ImageIcon } from 'lucide-react';
 
@@ -20,12 +21,28 @@ interface Product {
   category: { id: string; name: string } | null;
 }
 
-export default function AdminProductsPage() {
+function AdminProductsPageInner() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [filterCategory, setFilterCategory] = useState('');
-  const [filterActive, setFilterActive] = useState<'all' | 'active' | 'hidden'>('all');
+  
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [filterCategory, setFilterCategory] = useState(searchParams.get('category') || '');
+  const [filterActive, setFilterActive] = useState<'all' | 'active' | 'hidden'>((searchParams.get('active') as any) || 'all');
+
+  // Sync state to URL
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (filterCategory) params.set('category', filterCategory);
+    if (filterActive !== 'all') params.set('active', filterActive);
+    
+    const query = params.toString();
+    router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
+  }, [search, filterCategory, filterActive, pathname, router]);
 
   const fetchProducts = () => {
     fetch('/api/admin/products')
@@ -185,7 +202,7 @@ export default function AdminProductsPage() {
                     </td>
                     <td className="px-4 py-2.5 text-center">
                       <Link
-                        href={`/admin/products/${p.id}/edit`}
+                        href={`/admin/products/${p.id}/edit?return_to=${encodeURIComponent(pathname + '?' + searchParams.toString())}`}
                         className="inline-flex items-center gap-1 text-xs font-bold text-accent hover:text-accent-dark transition-colors no-underline"
                       >
                         <Pencil size={14} />
@@ -200,5 +217,13 @@ export default function AdminProductsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AdminProductsPage() {
+  return (
+    <Suspense fallback={<div className="text-gray-400 font-bold animate-pulse py-20 text-center">Загрузка интерфейса...</div>}>
+      <AdminProductsPageInner />
+    </Suspense>
   );
 }
