@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
       data: {
         externalId: data.externalId || null,
         categoryId: data.categoryId,
+        subcategoryId: data.subcategoryId || null,
         name: data.name,
         description: data.description || null,
         unit: data.unit || null,

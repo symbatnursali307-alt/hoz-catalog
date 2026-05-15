@@ -9,6 +9,13 @@ interface Category {
   id: string;
   name: string;
   slug: string;
+  subcategories?: Subcategory[];
+}
+
+interface Subcategory {
+  id: string;
+  name: string;
+  slug: string;
 }
 
 interface ProductFormProps {
@@ -28,6 +35,7 @@ export default function ProductForm({ productId }: ProductFormProps) {
   const [form, setForm] = useState({
     name: '',
     categoryId: '',
+    subcategoryId: '',
     externalId: '',
     priceWithoutVat: '',
     priceWithVat: '',
@@ -40,6 +48,8 @@ export default function ProductForm({ productId }: ProductFormProps) {
     sortOrder: '',
     isActive: true,
   });
+
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     // Load categories
@@ -59,6 +69,7 @@ export default function ProductForm({ productId }: ProductFormProps) {
             setForm({
               name: data.name || '',
               categoryId: data.categoryId || '',
+              subcategoryId: data.subcategoryId || '',
               externalId: data.externalId || '',
               priceWithoutVat: data.priceWithoutVat?.toString() || '',
               priceWithVat: data.priceWithVat?.toString() || '',
@@ -85,9 +96,59 @@ export default function ProductForm({ productId }: ProductFormProps) {
     if (type === 'checkbox') {
       setForm((prev) => ({ ...prev, [name]: (e.target as HTMLInputElement).checked }));
     } else {
-      setForm((prev) => ({ ...prev, [name]: value }));
+      setForm((prev) => {
+        const newForm = { ...prev, [name]: value };
+        if (name === 'categoryId') {
+          newForm.subcategoryId = ''; // Reset subcategory when category changes
+        }
+        return newForm;
+      });
     }
   };
+
+  const handleFileDrop = async (e: React.DragEvent<HTMLDivElement> | React.ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    let file: File | null = null;
+    
+    if ('dataTransfer' in e) {
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        file = e.dataTransfer.files[0];
+      }
+    } else if (e.target.files && e.target.files.length > 0) {
+      file = e.target.files[0];
+    }
+
+    if (!file) return;
+
+    setUploading(true);
+    setError('');
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/admin/upload/image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Ошибка загрузки');
+      }
+
+      setForm((prev) => ({ ...prev, photo: data.url }));
+    } catch (err: any) {
+      setError(err.message || 'Ошибка сервера при загрузке');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => e.preventDefault();
+
+  const selectedCategory = categories.find((c) => c.id === form.categoryId);
+  const subcategories = selectedCategory?.subcategories || [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -160,14 +221,31 @@ export default function ProductForm({ productId }: ProductFormProps) {
           </div>
 
           {/* Category */}
-          <div>
-            <label className={labelClass}>Категория *</label>
-            <select name="categoryId" value={form.categoryId} onChange={handleChange} className={inputClass} required>
-              <option value="">— Выберите —</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Категория *</label>
+              <select name="categoryId" value={form.categoryId} onChange={handleChange} className={inputClass} required>
+                <option value="">— Выберите —</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>Подкатегория</label>
+              <select 
+                name="subcategoryId" 
+                value={form.subcategoryId} 
+                onChange={handleChange} 
+                className={inputClass} 
+                disabled={!form.categoryId || subcategories.length === 0}
+              >
+                <option value="">— Нет —</option>
+                {subcategories.map((sc) => (
+                  <option key={sc.id} value={sc.id}>{sc.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* External ID */}
@@ -216,15 +294,52 @@ export default function ProductForm({ productId }: ProductFormProps) {
             <textarea name="description" value={form.description} onChange={handleChange} className={`${inputClass} min-h-[80px] resize-y`} placeholder="Описание товара..." />
           </div>
 
-          {/* Photo URL */}
+          {/* Photo Upload */}
           <div>
-            <label className={labelClass}>URL фото</label>
-            <input name="photo" value={form.photo} onChange={handleChange} className={inputClass} placeholder="https://..." />
-            {form.photo && (
-              <div className="mt-2 w-20 h-20 rounded-lg border border-gray-200 overflow-hidden bg-gray-50">
-                <img src={form.photo} alt="" className="w-full h-full object-contain" />
+            <label className={labelClass}>Фото товара</label>
+            <input type="hidden" name="photo" value={form.photo} />
+            
+            <div className="flex gap-4 items-start">
+              <div 
+                className={`flex-1 border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors
+                  ${uploading ? 'bg-gray-50 border-gray-300' : 'border-gray-300 hover:border-accent hover:bg-accent/5 bg-white'}`}
+                onDrop={handleFileDrop}
+                onDragOver={handleDragOver}
+                onClick={() => document.getElementById('photo-upload')?.click()}
+              >
+                <input 
+                  id="photo-upload" 
+                  type="file" 
+                  accept="image/png, image/jpeg, image/jpg, image/webp" 
+                  className="hidden" 
+                  onChange={handleFileDrop} 
+                />
+                
+                {uploading ? (
+                  <div className="text-accent font-bold text-sm animate-pulse">Загрузка...</div>
+                ) : (
+                  <>
+                    <div className="text-gray-500 mb-1">
+                      Перетащите фото сюда
+                    </div>
+                    <div className="text-sm text-gray-400">или нажмите для загрузки</div>
+                  </>
+                )}
               </div>
-            )}
+
+              {form.photo && (
+                <div className="w-[100px] h-[100px] shrink-0 rounded-xl border border-gray-200 overflow-hidden bg-gray-50 relative group">
+                  <img src={form.photo} alt="Preview" className="w-full h-full object-contain" />
+                  <button 
+                    type="button"
+                    onClick={() => setForm(prev => ({ ...prev, photo: '' }))}
+                    className="absolute inset-0 bg-black/50 text-white font-bold opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+                  >
+                    Удалить
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Sort + Active */}

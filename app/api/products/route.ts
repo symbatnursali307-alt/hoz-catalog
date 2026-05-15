@@ -35,6 +35,13 @@ export async function GET(request: NextRequest) {
             slug: true,
             name: true
           }
+        },
+        subcategory: {
+          select: {
+            id: true,
+            slug: true,
+            name: true
+          }
         }
       }
     });

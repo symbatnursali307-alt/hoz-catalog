@@ -14,6 +14,9 @@ export async function GET(request: NextRequest) {
       orderBy: { sortOrder: 'asc' },
       include: {
         _count: { select: { products: true } },
+        subcategories: {
+          orderBy: { sortOrder: 'asc' }
+        }
       },
     });
 

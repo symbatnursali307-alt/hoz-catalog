@@ -2,15 +2,22 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useCartStore, Product } from '@/store/cart';
-import { Search, ChevronDown, ChevronUp, ImageIcon, LogIn } from 'lucide-react';
+import { Search, ImageIcon, LogIn, ArrowUp, Menu } from 'lucide-react';
 import ProductModal from '@/components/ProductModal';
 import CartModal from '@/components/CartModal';
 import { formatPrice } from '@/lib/utils';
+
+interface Subcategory {
+  id: string;
+  slug: string;
+  name: string;
+}
 
 interface Category {
   id: string;
   slug: string;
   name: string;
+  subcategories?: Subcategory[];
 }
 
 export default function CatalogPage() {
@@ -22,8 +29,10 @@ export default function CatalogPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   
-  // Track which categories are open
-  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
+  const [activeCategoryId, setActiveCategoryId] = useState<string | 'all'>('all');
+  const [activeSubcategoryId, setActiveSubcategoryId] = useState<string | 'all'>('all');
+
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -33,14 +42,12 @@ export default function CatalogPage() {
       if (Array.isArray(cats)) {
         setCategories(cats);
         if (cats.length > 0) {
-          setOpenCategories({ [cats[0].name]: true });
+          setActiveCategoryId(cats[0].id); // Default to first category
         }
       }
-      
       if (Array.isArray(prods)) {
         setProducts(prods);
       }
-      
       setLoading(false);
     }).catch(err => {
       console.error('Error fetching data:', err);
@@ -48,24 +55,64 @@ export default function CatalogPage() {
     });
   }, []);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 500);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   const { items, getTotalItems, getTotalPrice } = useCartStore();
   const totalItems = getTotalItems();
   const totalPrice = getTotalPrice();
 
-  const toggleCategory = (title: string) => {
-    setOpenCategories(prev => ({ ...prev, [title]: !prev[title] }));
+  const handleCategoryClick = (categoryId: string) => {
+    setActiveCategoryId(categoryId);
+    setActiveSubcategoryId('all');
   };
 
-  // Filter products based on search
+  const activeCategory = useMemo(() => 
+    categories.find(c => c.id === activeCategoryId), 
+  [activeCategoryId, categories]);
+
+  // Filter products based on search, category, and subcategory
   const filteredProducts = useMemo(() => {
-    if (!searchQuery.trim()) return products;
-    const q = searchQuery.toLowerCase().trim();
-    return products.filter(p => 
-      p.name.toLowerCase().includes(q) || 
-      (p.category?.name?.toLowerCase().includes(q)) ||
-      (p.description && p.description.toLowerCase().includes(q))
-    );
-  }, [searchQuery, products]);
+    let result = products;
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter(p => 
+        p.name.toLowerCase().includes(q) || 
+        (p.category?.name?.toLowerCase().includes(q)) ||
+        (p.subcategory?.name?.toLowerCase().includes(q)) ||
+        (p.description && p.description.toLowerCase().includes(q))
+      );
+    } else {
+      if (activeCategoryId !== 'all') {
+        result = result.filter(p => p.category?.id === activeCategoryId);
+      }
+      if (activeSubcategoryId !== 'all') {
+        result = result.filter(p => p.subcategory?.id === activeSubcategoryId);
+      }
+    }
+
+    return result;
+  }, [searchQuery, products, activeCategoryId, activeSubcategoryId]);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const scrollToCategories = () => {
+    const el = document.getElementById('categories-nav');
+    if (el) {
+      const y = el.getBoundingClientRect().top + window.scrollY - 80;
+      window.scrollTo({ top: y, behavior: 'smooth' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   if (loading) {
     return (
@@ -76,7 +123,7 @@ export default function CatalogPage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen pb-[120px]">
       <header className="bg-gradient-to-br from-gray-900 to-gray-800 text-white px-4 pt-6 pb-[22px] relative">
         <div className="absolute top-4 right-4 sm:right-6">
           <a href="/admin" className="text-white/30 hover:text-white/80 transition-colors flex items-center gap-1.5 text-[13px] font-medium" title="Вход в админ-панель">
@@ -91,126 +138,189 @@ export default function CatalogPage() {
           <p className="m-0 text-gray-300 text-[15px] max-w-[760px]">
             Выберите нужные товары, добавьте количество и отправьте список менеджеру в WhatsApp.
           </p>
-          
-          <div className="flex flex-wrap gap-2.5 mt-4">
-            <a 
-              className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-extrabold no-underline text-[15px] min-h-[48px] text-white border border-white/25 bg-white/10 hover:bg-white/20 transition-colors"
-              href="#catalog"
-            >
-              Открыть каталог
-            </a>
-          </div>
         </div>
       </header>
 
-      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-md border-b border-line px-4 py-3">
-        <div className="max-w-[1120px] mx-auto flex gap-3 items-center">
-          <div className="relative flex-1">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-              <Search size={20} />
+      {/* Sticky Search & Navigation Area */}
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md shadow-sm border-b border-line">
+        <div className="max-w-[1120px] mx-auto">
+          {/* Search Bar */}
+          <div className="px-4 py-3 flex gap-3 items-center">
+            <div className="relative flex-1">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <Search size={20} />
+              </div>
+              <input 
+                type="search" 
+                className="w-full pl-10 pr-4 py-3.5 border border-line rounded-xl text-base outline-none bg-white focus:border-accent transition-colors"
+                placeholder="Поиск: перчатки, пакет, плёнка..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
-            <input 
-              type="search" 
-              className="w-full pl-10 pr-4 py-3.5 border border-line rounded-xl text-base outline-none bg-white focus:border-accent transition-colors"
-              placeholder="Поиск: перчатки, пакет, плёнка, коврик..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+            <div className="hidden sm:block text-muted text-sm whitespace-nowrap font-medium">
+              Товаров: {filteredProducts.length}
+            </div>
           </div>
-          <div className="hidden sm:block text-muted text-sm whitespace-nowrap font-medium">
-            Товаров: {filteredProducts.length}
-          </div>
+
+          {/* Main Categories Nav */}
+          {!searchQuery && (
+            <div id="categories-nav" className="overflow-x-auto hide-scrollbar px-4 pb-3 flex gap-2">
+              <button
+                onClick={() => handleCategoryClick('all')}
+                className={`px-4 py-2 rounded-full font-bold text-[14px] whitespace-nowrap transition-colors shrink-0 ${
+                  activeCategoryId === 'all' 
+                    ? 'bg-gray-900 text-white shadow-md' 
+                    : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                Все товары
+              </button>
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => handleCategoryClick(cat.id)}
+                  className={`px-4 py-2 rounded-full font-bold text-[14px] whitespace-nowrap transition-colors shrink-0 ${
+                    activeCategoryId === cat.id 
+                      ? 'bg-accent text-white shadow-md shadow-accent/20' 
+                      : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {cat.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      <main id="catalog" className="max-w-[1120px] mx-auto px-4 pt-[18px] pb-5">
-        {categories.map((category) => {
-          // Filter items for this category
-          const categoryProducts = filteredProducts.filter(p => p.category?.id === category.id);
-          
-          // Hide category if search yields no results for it
-          if (categoryProducts.length === 0) return null;
-          
-          // Force open if searching
-          const isOpen = searchQuery.trim() ? true : openCategories[category.name];
-
-          return (
-            <div key={category.id} className="bg-white border border-line rounded-[18px] mb-3.5 overflow-hidden">
-              <div 
-                className="cursor-pointer p-[18px] flex justify-between items-center bg-white hover:bg-gray-50 transition-colors"
-                onClick={() => toggleCategory(category.name)}
+      {/* Subcategories Nav */}
+      {!searchQuery && activeCategory && activeCategory.subcategories && activeCategory.subcategories.length > 0 && (
+        <div className="bg-white border-b border-line">
+          <div className="max-w-[1120px] mx-auto overflow-x-auto hide-scrollbar px-4 py-2.5 flex gap-2">
+            <button
+              onClick={() => setActiveSubcategoryId('all')}
+              className={`px-4 py-1.5 rounded-full font-bold text-[13px] whitespace-nowrap transition-colors shrink-0 border ${
+                activeSubcategoryId === 'all' 
+                  ? 'bg-gray-100 border-gray-300 text-gray-900' 
+                  : 'bg-transparent border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              Все
+            </button>
+            {activeCategory.subcategories.map((sub) => (
+              <button
+                key={sub.id}
+                onClick={() => setActiveSubcategoryId(sub.id)}
+                className={`px-4 py-1.5 rounded-full font-bold text-[13px] whitespace-nowrap transition-colors shrink-0 border ${
+                  activeSubcategoryId === sub.id 
+                    ? 'bg-gray-100 border-gray-300 text-gray-900' 
+                    : 'bg-transparent border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+                }`}
               >
-                <div className="flex items-center gap-3">
-                  <span className="text-lg sm:text-[20px] font-black tracking-tight">{category.name}</span>
-                  <b className="text-[13px] text-muted bg-gray-100 rounded-full px-2.5 py-1.5 whitespace-nowrap font-bold">
-                    {categoryProducts.length} товаров
-                  </b>
-                </div>
-                <div className="text-gray-400">
-                  {isOpen ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
-                </div>
-              </div>
+                {sub.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
-              {isOpen && (
-                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3 px-2.5 sm:px-3.5 pb-2.5 sm:pb-3.5">
-                  {categoryProducts.map(product => (
-                    <article 
-                      key={product.id}
-                      onClick={() => setSelectedProduct(product)}
-                      className="bg-white border border-line rounded-2xl p-2.5 sm:p-3 flex flex-col gap-2.5 cursor-pointer hover:-translate-y-px hover:shadow-[0_8px_22px_rgba(17,24,39,0.08)] transition-all duration-150 h-full"
-                    >
-                      <div className="aspect-square w-full rounded-xl overflow-hidden bg-gray-50 border border-line flex flex-col items-center justify-center text-gray-500 text-xs font-bold text-center relative shrink-0">
-                        {product.photo ? (
-                          <img 
-                            src={product.photo} 
-                            alt={product.name}
-                            className="w-full h-full object-contain p-2"
-                          />
-                        ) : (
-                          <>
-                            <ImageIcon size={20} className="mb-1 opacity-50" />
-                            Фото позже
-                          </>
-                        )}
-                      </div>
-                      <div className="flex flex-col flex-1">
-                        <h3 className="m-0 text-[14px] sm:text-[16px] leading-tight font-bold text-gray-900 mb-1 line-clamp-2 h-[2.5em] sm:h-[2.5em]">
-                          {product.name}
-                        </h3>
-                        <div className="mt-auto pt-1">
-                          <div className="text-[18px] sm:text-[22px] font-black tracking-tight text-dark leading-none mb-1">
-                            {product.price || 'Цена по запросу'}
-                          </div>
-                          {product.unit && (
-                            <div className="text-muted text-[11px] sm:text-[13px] leading-tight opacity-80 font-medium">
-                              {product.unit}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-
-            </div>
-          );
-        })}
+      {/* Main Content Grid */}
+      <main id="catalog" className="max-w-[1120px] mx-auto px-4 pt-6 pb-8">
         
-        {filteredProducts.length === 0 && (
-          <div className="text-center py-20 text-muted">
-            По вашему запросу ничего не найдено.
+        {searchQuery && (
+          <h2 className="text-xl font-bold mb-4">Результаты поиска: {searchQuery}</h2>
+        )}
+
+        {filteredProducts.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+            {filteredProducts.map(product => (
+              <article 
+                key={product.id}
+                onClick={() => setSelectedProduct(product)}
+                className="bg-white border border-line rounded-2xl p-2.5 sm:p-3 flex flex-col gap-2.5 cursor-pointer hover:-translate-y-1 hover:shadow-lg transition-all duration-200 h-full group"
+              >
+                <div className="aspect-square w-full rounded-xl overflow-hidden bg-gray-50/50 border border-line flex flex-col items-center justify-center text-gray-500 text-xs font-bold text-center relative shrink-0 group-hover:border-accent/30 transition-colors">
+                  {product.photo ? (
+                    <img 
+                      src={product.photo} 
+                      alt={product.name}
+                      className="w-full h-full object-contain p-2 mix-blend-multiply"
+                    />
+                  ) : (
+                    <>
+                      <ImageIcon size={24} className="mb-1.5 opacity-30" />
+                      <span className="opacity-60">Фото позже</span>
+                    </>
+                  )}
+                </div>
+                <div className="flex flex-col flex-1">
+                  <h3 className="m-0 text-[14px] sm:text-[15px] leading-snug font-bold text-gray-900 mb-1 line-clamp-3">
+                    {product.name}
+                  </h3>
+                  <div className="mt-auto pt-2">
+                    <div className="text-[17px] sm:text-[20px] font-black tracking-tight text-dark leading-none mb-1">
+                      {product.price || 'Цена по запросу'}
+                    </div>
+                    {product.unit && (
+                      <div className="text-muted text-[12px] leading-tight opacity-80 font-medium">
+                        {product.unit}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-20 text-muted bg-white rounded-3xl border border-dashed border-gray-200">
+            <div className="text-4xl mb-4">🔍</div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Ничего не найдено</h3>
+            <p>По вашему запросу или выбранным фильтрам нет товаров.</p>
+            {(activeCategoryId !== 'all' || activeSubcategoryId !== 'all' || searchQuery) && (
+              <button 
+                onClick={() => {
+                  handleCategoryClick('all');
+                  setSearchQuery('');
+                }}
+                className="mt-4 px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg font-bold text-sm transition-colors cursor-pointer"
+              >
+                Сбросить фильтры
+              </button>
+            )}
           </div>
         )}
       </main>
 
-      <div className="fixed left-0 right-0 bottom-0 z-50 bg-white border-t border-line px-4 py-2.5 shadow-[0_-8px_28px_rgba(17,24,39,0.08)]">
+      {/* Floating Buttons */}
+      <div className="fixed right-4 bottom-[88px] sm:bottom-[100px] z-40 flex flex-col gap-2">
+        <button 
+          onClick={scrollToCategories}
+          className="w-12 h-12 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-full flex items-center justify-center text-gray-700 shadow-lg hover:bg-white hover:text-accent transition-colors lg:hidden"
+          title="К категориям"
+        >
+          <Menu size={22} />
+        </button>
+        
+        {showScrollTop && (
+          <button 
+            onClick={scrollToTop}
+            className="w-12 h-12 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-full flex items-center justify-center text-gray-700 shadow-lg hover:bg-white hover:text-accent transition-colors animate-in fade-in zoom-in duration-200"
+            title="Наверх"
+          >
+            <ArrowUp size={22} />
+          </button>
+        )}
+      </div>
+
+      {/* Cart Bottom Bar */}
+      <div className="fixed left-0 right-0 bottom-0 z-50 bg-white border-t border-line px-4 py-3 shadow-[0_-8px_28px_rgba(17,24,39,0.08)]">
         <div className="max-w-[1120px] mx-auto flex flex-col sm:flex-row gap-3 items-center justify-between">
           <div className="text-center sm:text-left flex-1">
-            <div className="font-black text-gray-900 text-lg">
+            <div className="font-black text-gray-900 text-[19px] leading-none">
               {totalItems > 0 && totalPrice > 0 ? `Итого: ${formatPrice(totalPrice)}` : totalItems > 0 ? `В корзине: ${totalItems} шт.` : 'Корзина пустая'}
             </div>
-            <div className="text-muted text-[13px] font-medium mt-0.5">
+            <div className="text-muted text-[13px] font-medium mt-1">
               {totalItems > 0 
                 ? `${items.length} позиций — можно отправить заказ` 
                 : 'Откройте товар и добавьте количество'}

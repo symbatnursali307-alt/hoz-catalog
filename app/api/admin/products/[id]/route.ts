@@ -47,6 +47,7 @@ export async function PUT(
       data: {
         externalId: data.externalId || null,
         categoryId: data.categoryId,
+        subcategoryId: data.subcategoryId || null,
         name: data.name,
         description: data.description || null,
         unit: data.unit || null,
@@ -85,6 +86,7 @@ export async function PATCH(
     const updateData: any = {};
     if (data.externalId !== undefined) updateData.externalId = data.externalId;
     if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
+    if (data.subcategoryId !== undefined) updateData.subcategoryId = data.subcategoryId;
     if (data.name !== undefined) updateData.name = data.name;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.unit !== undefined) updateData.unit = data.unit;

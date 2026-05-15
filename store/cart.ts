@@ -18,6 +18,11 @@ export interface Product {
     slug: string;
     name: string;
   };
+  subcategory?: {
+    id: string;
+    slug: string;
+    name: string;
+  };
 }
 
 export interface CartItem extends Product {

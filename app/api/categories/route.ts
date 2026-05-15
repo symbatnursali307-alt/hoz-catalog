@@ -10,7 +10,17 @@ export async function GET() {
         id: true,
         slug: true,
         name: true,
-        sortOrder: true
+        sortOrder: true,
+        subcategories: {
+          where: { isActive: true },
+          orderBy: { sortOrder: 'asc' },
+          select: {
+            id: true,
+            slug: true,
+            name: true,
+            sortOrder: true,
+          }
+        }
       }
     });
     
