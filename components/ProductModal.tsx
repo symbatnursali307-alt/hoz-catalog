@@ -1,8 +1,10 @@
 'use client';
 
+import Image from 'next/image';
 import { useState } from 'react';
 import { useCartStore, Product } from '@/store/cart';
 import { Plus, Minus, X } from 'lucide-react';
+import { calculatePriceWithVat } from '@/lib/pricing';
 
 export default function ProductModal({
   product,
@@ -13,6 +15,7 @@ export default function ProductModal({
 }) {
   const [qty, setQty] = useState(1);
   const addToCart = useCartStore((state) => state.addToCart);
+  const displayedPriceWithVat = product.priceWithVat ?? calculatePriceWithVat(product.priceWithoutVat);
 
   const handleAdd = () => {
     addToCart(product, qty);
@@ -24,10 +27,13 @@ export default function ProductModal({
       <div className="bg-white w-full max-w-[380px] max-h-[92vh] overflow-y-auto rounded-[22px] p-4 shadow-2xl animate-in zoom-in-95 duration-200">
         <div className="aspect-square w-full rounded-[18px] mb-4 bg-gray-50 border border-line flex items-center justify-center text-gray-500 font-extrabold overflow-hidden relative">
           {product.photo ? (
-            <img 
+            <Image
               src={product.photo} 
               alt={product.name}
-              className="w-full h-full object-contain p-2"
+              fill
+              sizes="(max-width: 640px) calc(100vw - 24px), 380px"
+              quality={82}
+              className="object-contain p-2"
             />
           ) : (
             "Фото товара"
@@ -47,9 +53,9 @@ export default function ProductModal({
                 </div>
               )}
             </div>
-            {product.priceWithVat && (
+            {displayedPriceWithVat && (
               <div className="text-muted text-sm font-medium mt-0.5">
-                Цена с НДС: <span className="text-gray-700 font-semibold">{product.priceWithVat.toLocaleString('ru-RU')} тг.</span>
+                Цена с НДС: <span className="text-gray-700 font-semibold">{displayedPriceWithVat.toLocaleString('ru-RU')} тг.</span>
               </div>
             )}
           </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { checkAdminAuth } from '@/lib/admin-auth';
+import { calculatePriceWithVat } from '@/lib/pricing';
 
 export async function GET(request: NextRequest) {
   const isAuthed = await checkAdminAuth(request);
@@ -31,6 +32,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const data = await request.json();
+    const priceWithoutVat = data.priceWithoutVat ? parseInt(data.priceWithoutVat) : null;
+    const priceWithVat = data.priceWithVat ? parseFloat(data.priceWithVat) : calculatePriceWithVat(priceWithoutVat);
 
     const product = await prisma.product.create({
       data: {
@@ -40,8 +43,8 @@ export async function POST(request: NextRequest) {
         name: data.name,
         description: data.description || null,
         unit: data.unit || null,
-        priceWithoutVat: data.priceWithoutVat ? parseInt(data.priceWithoutVat) : null,
-        priceWithVat: data.priceWithVat ? parseFloat(data.priceWithVat) : null,
+        priceWithoutVat,
+        priceWithVat,
         price: data.priceWithoutVat ? `${data.priceWithoutVat} тг.` : null,
         packageType: data.packageType || null,
         packageQuantity: data.packageQuantity ? parseInt(data.packageQuantity) : null,

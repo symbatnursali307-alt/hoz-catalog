@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useCartStore } from '@/store/cart';
 import { X, ShoppingCart, Trash2, Send, Plus, Minus } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
+import { resolvePriceWithVat } from '@/lib/pricing';
 
 export default function CartModal({ onClose }: { onClose: () => void }) {
   const { items, removeFromCart, updateQty, clearCart, getTotalPrice } = useCartStore();
@@ -14,9 +15,8 @@ export default function CartModal({ onClose }: { onClose: () => void }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const totalPrice = getTotalPrice();
-  // Approximate total with VAT (36%)
   const totalWithVat = items.reduce((sum, item) => {
-    const priceVat = item.priceWithVat ?? ((item.priceWithoutVat ?? 0) * 1.36);
+    const priceVat = resolvePriceWithVat(item.priceWithVat, item.priceWithoutVat);
     const pkgQty = item.packageQuantity ?? 1;
     return sum + (priceVat * pkgQty * item.qty);
   }, 0);
@@ -99,7 +99,7 @@ export default function CartModal({ onClose }: { onClose: () => void }) {
             <div className="flex flex-col gap-3">
               {items.map((item) => {
                 const priceNoVat = item.priceWithoutVat ?? 0;
-                const priceVat = item.priceWithVat ?? (priceNoVat * 1.36);
+                const priceVat = resolvePriceWithVat(item.priceWithVat, priceNoVat);
                 const pkgQty = item.packageQuantity ?? 1;
                 const lineTotalNoVat = priceNoVat * pkgQty * item.qty;
                 const lineTotalVat = priceVat * pkgQty * item.qty;

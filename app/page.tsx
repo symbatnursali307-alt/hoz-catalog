@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import Image from 'next/image';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useCartStore, Product } from '@/store/cart';
 import { Search, ImageIcon, LogIn, ArrowUp, Menu } from 'lucide-react';
 import ProductModal from '@/components/ProductModal';
@@ -20,12 +21,25 @@ interface Category {
   subcategories?: Subcategory[];
 }
 
+interface ProductsResponse {
+  items: Product[];
+  total: number;
+  nextOffset: number;
+  hasMore: boolean;
+}
+
+const PAGE_SIZE = 24;
+
 export default function CatalogPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productsTotal, setProductsTotal] = useState(0);
+  const [hasMoreProducts, setHasMoreProducts] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   
@@ -33,20 +47,17 @@ export default function CatalogPage() {
   const [activeSubcategoryId, setActiveSubcategoryId] = useState<string | 'all'>('all');
 
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
-    Promise.all([
-      fetch('/api/categories').then(res => res.json()),
-      fetch('/api/products').then(res => res.json())
-    ]).then(([cats, prods]) => {
+    fetch('/api/categories')
+      .then(res => res.json())
+      .then((cats) => {
       if (Array.isArray(cats)) {
         setCategories(cats);
         if (cats.length > 0) {
           setActiveCategoryId(cats[0].id); // Default to first category
         }
-      }
-      if (Array.isArray(prods)) {
-        setProducts(prods);
       }
       setLoading(false);
     }).catch(err => {
@@ -54,6 +65,14 @@ export default function CatalogPage() {
       setLoading(false);
     });
   }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -76,29 +95,53 @@ export default function CatalogPage() {
     categories.find(c => c.id === activeCategoryId), 
   [activeCategoryId, categories]);
 
-  // Filter products based on search, category, and subcategory
-  const filteredProducts = useMemo(() => {
-    let result = products;
+  const loadProducts = useCallback(async (offset: number, reset: boolean) => {
+    const requestId = ++requestIdRef.current;
+    const params = new URLSearchParams({
+      limit: String(PAGE_SIZE),
+      offset: String(offset),
+    });
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      result = result.filter(p => 
-        p.name.toLowerCase().includes(q) || 
-        (p.category?.name?.toLowerCase().includes(q)) ||
-        (p.subcategory?.name?.toLowerCase().includes(q)) ||
-        (p.description && p.description.toLowerCase().includes(q))
-      );
+    if (debouncedSearchQuery) {
+      params.set('search', debouncedSearchQuery);
     } else {
-      if (activeCategoryId !== 'all') {
-        result = result.filter(p => p.category?.id === activeCategoryId);
-      }
-      if (activeSubcategoryId !== 'all') {
-        result = result.filter(p => p.subcategory?.id === activeSubcategoryId);
-      }
+      if (activeCategoryId !== 'all') params.set('categoryId', activeCategoryId);
+      if (activeSubcategoryId !== 'all') params.set('subcategoryId', activeSubcategoryId);
     }
 
-    return result;
-  }, [searchQuery, products, activeCategoryId, activeSubcategoryId]);
+    setProductsLoading(true);
+
+    try {
+      const res = await fetch(`/api/products?${params.toString()}`);
+      const data = await res.json() as ProductsResponse;
+
+      if (requestId !== requestIdRef.current) return;
+
+      const nextProducts = Array.isArray(data.items) ? data.items : [];
+      setProducts(prev => reset ? nextProducts : [...prev, ...nextProducts]);
+      setProductsTotal(typeof data.total === 'number' ? data.total : nextProducts.length);
+      setHasMoreProducts(Boolean(data.hasMore));
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      if (requestId === requestIdRef.current && reset) {
+        setProducts([]);
+        setProductsTotal(0);
+        setHasMoreProducts(false);
+      }
+    } finally {
+      if (requestId === requestIdRef.current) {
+        setProductsLoading(false);
+      }
+    }
+  }, [activeCategoryId, activeSubcategoryId, debouncedSearchQuery]);
+
+  useEffect(() => {
+    if (loading) return;
+    setProducts([]);
+    setProductsTotal(0);
+    setHasMoreProducts(false);
+    loadProducts(0, true);
+  }, [loading, activeCategoryId, activeSubcategoryId, debouncedSearchQuery, loadProducts]);
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -111,6 +154,12 @@ export default function CatalogPage() {
       window.scrollTo({ top: y, behavior: 'smooth' });
     } else {
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (!productsLoading && hasMoreProducts) {
+      loadProducts(products.length, false);
     }
   };
 
@@ -159,12 +208,12 @@ export default function CatalogPage() {
               />
             </div>
             <div className="hidden sm:block text-muted text-sm whitespace-nowrap font-medium">
-              Товаров: {filteredProducts.length}
+              Товаров: {productsTotal}
             </div>
           </div>
 
           {/* Main Categories Nav */}
-          {!searchQuery && (
+          {!searchQuery.trim() && (
             <div id="categories-nav" className="overflow-x-auto hide-scrollbar px-4 pb-3 flex gap-2">
               <button
                 onClick={() => handleCategoryClick('all')}
@@ -195,7 +244,7 @@ export default function CatalogPage() {
       </div>
 
       {/* Subcategories Nav */}
-      {!searchQuery && activeCategory && activeCategory.subcategories && activeCategory.subcategories.length > 0 && (
+      {!searchQuery.trim() && activeCategory && activeCategory.subcategories && activeCategory.subcategories.length > 0 && (
         <div className="bg-white border-b border-line">
           <div className="max-w-[1120px] mx-auto overflow-x-auto hide-scrollbar px-4 py-2.5 flex gap-2">
             <button
@@ -232,9 +281,9 @@ export default function CatalogPage() {
           <h2 className="text-xl font-bold mb-4">Результаты поиска: {searchQuery}</h2>
         )}
 
-        {filteredProducts.length > 0 ? (
+        {products.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-            {filteredProducts.map(product => (
+            {products.map((product, index) => (
               <article 
                 key={product.id}
                 onClick={() => setSelectedProduct(product)}
@@ -242,10 +291,15 @@ export default function CatalogPage() {
               >
                 <div className="aspect-square w-full rounded-xl overflow-hidden bg-gray-50/50 border border-line flex flex-col items-center justify-center text-gray-500 text-xs font-bold text-center relative shrink-0 group-hover:border-accent/30 transition-colors">
                   {product.photo ? (
-                    <img 
+                    <Image
                       src={product.photo} 
                       alt={product.name}
-                      className="w-full h-full object-contain p-2 mix-blend-multiply"
+                      fill
+                      sizes="(max-width: 640px) 46vw, (max-width: 1024px) 30vw, 260px"
+                      quality={68}
+                      loading={index < 4 ? 'eager' : 'lazy'}
+                      fetchPriority={index < 2 ? 'high' : 'auto'}
+                      className="object-contain p-2 mix-blend-multiply"
                     />
                   ) : (
                     <>
@@ -272,6 +326,19 @@ export default function CatalogPage() {
               </article>
             ))}
           </div>
+        ) : productsLoading ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+            {Array.from({ length: 10 }).map((_, index) => (
+              <div key={index} className="bg-white border border-line rounded-2xl p-2.5 sm:p-3 flex flex-col gap-2.5 h-full">
+                <div className="aspect-square w-full rounded-xl bg-gray-100 animate-pulse" />
+                <div className="h-4 rounded bg-gray-100 animate-pulse" />
+                <div className="h-4 w-3/4 rounded bg-gray-100 animate-pulse" />
+                <div className="mt-auto pt-2">
+                  <div className="h-5 w-1/2 rounded bg-gray-100 animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="text-center py-20 text-muted bg-white rounded-3xl border border-dashed border-gray-200">
             <div className="text-4xl mb-4">🔍</div>
@@ -287,6 +354,24 @@ export default function CatalogPage() {
               >
                 Сбросить фильтры
               </button>
+            )}
+          </div>
+        )}
+
+        {products.length > 0 && (
+          <div className="mt-6 flex justify-center">
+            {hasMoreProducts ? (
+              <button
+                onClick={handleLoadMore}
+                disabled={productsLoading}
+                className="px-6 py-3 rounded-xl bg-white border border-line text-gray-800 hover:bg-gray-50 disabled:opacity-60 font-bold text-sm shadow-sm transition-colors"
+              >
+                {productsLoading ? 'Загрузка...' : 'Показать ещё'}
+              </button>
+            ) : (
+              <div className="text-muted text-sm font-medium">
+                Показаны все товары
+              </div>
             )}
           </div>
         )}

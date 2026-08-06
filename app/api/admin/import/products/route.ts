@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { checkAdminAuth } from '@/lib/admin-auth';
 import slugify from 'slugify';
+import { calculatePriceWithVat } from '@/lib/pricing';
 
 function makeSlug(text: string) {
   return slugify(text, { lower: true, strict: true, locale: 'ru' });
@@ -59,13 +60,17 @@ export async function POST(request: NextRequest) {
 
         // Map snake_case -> camelCase
         const externalId = row.external_id?.trim() || null;
+        const priceWithoutVat = row.price_without_vat != null ? Math.round(Number(row.price_without_vat)) : null;
+        const priceWithVat = row.price_with_vat != null && String(row.price_with_vat).trim()
+          ? parseFloat(String(row.price_with_vat))
+          : calculatePriceWithVat(priceWithoutVat);
         const data = {
           name: row.name.trim(),
           categoryId: category.id,
           externalId,
-          priceWithoutVat: row.price_without_vat != null ? Math.round(Number(row.price_without_vat)) : null,
-          priceWithVat: row.price_with_vat != null ? parseFloat(String(row.price_with_vat)) : null,
-          price: row.price_without_vat != null ? `${Math.round(Number(row.price_without_vat))} тг.` : null,
+          priceWithoutVat,
+          priceWithVat,
+          price: priceWithoutVat != null ? `${priceWithoutVat} тг.` : null,
           unit: row.unit?.trim() || null,
           description: row.description?.trim() || null,
           packageType: row.package_type?.trim() || null,

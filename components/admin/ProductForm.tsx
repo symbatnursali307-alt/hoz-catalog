@@ -267,7 +267,7 @@ function ProductFormInner({ productId }: ProductFormProps) {
             </div>
             <div>
               <label className={labelClass}>Цена с НДС (₸)</label>
-              <input name="priceWithVat" type="number" step="0.01" value={form.priceWithVat} onChange={handleChange} className={inputClass} placeholder="204" />
+              <input name="priceWithVat" type="number" step="0.01" value={form.priceWithVat} onChange={handleChange} className={inputClass} placeholder="195" />
             </div>
           </div>
 

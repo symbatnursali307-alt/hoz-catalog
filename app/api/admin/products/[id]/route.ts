@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { checkAdminAuth } from '@/lib/admin-auth';
+import { calculatePriceWithVat } from '@/lib/pricing';
 
 export async function GET(
   request: NextRequest,
@@ -41,6 +42,8 @@ export async function PUT(
   try {
     const { id } = await params;
     const data = await request.json();
+    const priceWithoutVat = data.priceWithoutVat ? parseInt(data.priceWithoutVat) : null;
+    const priceWithVat = data.priceWithVat ? parseFloat(data.priceWithVat) : calculatePriceWithVat(priceWithoutVat);
 
     const product = await prisma.product.update({
       where: { id },
@@ -51,8 +54,8 @@ export async function PUT(
         name: data.name,
         description: data.description || null,
         unit: data.unit || null,
-        priceWithoutVat: data.priceWithoutVat ? parseInt(data.priceWithoutVat) : null,
-        priceWithVat: data.priceWithVat ? parseFloat(data.priceWithVat) : null,
+        priceWithoutVat,
+        priceWithVat,
         price: data.priceWithoutVat ? `${data.priceWithoutVat} тг.` : null,
         packageType: data.packageType || null,
         packageQuantity: data.packageQuantity ? parseInt(data.packageQuantity) : null,
@@ -90,8 +93,17 @@ export async function PATCH(
     if (data.name !== undefined) updateData.name = data.name;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.unit !== undefined) updateData.unit = data.unit;
-    if (data.priceWithoutVat !== undefined) updateData.priceWithoutVat = data.priceWithoutVat ? parseInt(data.priceWithoutVat) : null;
-    if (data.priceWithVat !== undefined) updateData.priceWithVat = data.priceWithVat ? parseFloat(data.priceWithVat) : null;
+    if (data.priceWithoutVat !== undefined) {
+      updateData.priceWithoutVat = data.priceWithoutVat ? parseInt(data.priceWithoutVat) : null;
+      if (data.priceWithVat === undefined) {
+        updateData.priceWithVat = calculatePriceWithVat(updateData.priceWithoutVat);
+      }
+    }
+    if (data.priceWithVat !== undefined) {
+      updateData.priceWithVat = data.priceWithVat
+        ? parseFloat(data.priceWithVat)
+        : calculatePriceWithVat(updateData.priceWithoutVat);
+    }
     if (data.price !== undefined) updateData.price = data.price;
     if (data.photo !== undefined) updateData.photo = data.photo;
     if (data.packageType !== undefined) updateData.packageType = data.packageType;

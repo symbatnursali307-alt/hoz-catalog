@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import slugify from "slugify";
 import { parse } from "csv-parse/sync";
 import { PrismaClient } from "@prisma/client";
+import { calculatePriceWithVat } from "../lib/pricing";
 
 dotenv.config(); // Загружает .env по умолчанию
 
@@ -93,15 +94,16 @@ async function importProduct(row: ProductRow, index: number) {
   const category = await getOrCreateCategory(row.category);
 
   const externalId = row.external_id?.trim() || `AUTO-${index + 1}`;
+  const priceWithoutVat = toNumber(row.price_without_vat);
 
   const data = {
     name: row.name.trim(),
     externalId,
     categoryId: category.id,
     
-    priceWithoutVat: toNumber(row.price_without_vat),
-    priceWithVat: toNumber(row.price_with_vat) ? parseFloat(String(row.price_with_vat).replace(/[^\d.]/g, '')) : null,
-    price: row.price_without_vat ? `${toNumber(row.price_without_vat)} тг.` : null,
+    priceWithoutVat,
+    priceWithVat: calculatePriceWithVat(priceWithoutVat),
+    price: priceWithoutVat ? `${priceWithoutVat} тг.` : null,
 
     unit: row.unit?.trim() || null,
     description: row.description?.trim() || null,

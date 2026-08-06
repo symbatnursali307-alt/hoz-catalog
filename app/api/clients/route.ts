@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/prisma';
+import { resolvePriceWithVat } from '@/lib/pricing';
 
 export async function POST(request: NextRequest) {
   try {
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
       if (product) {
         const qty = item.qty || 1;
         const priceNoVat = product.priceWithoutVat || 0;
-        const priceWithVat = product.priceWithVat || (priceNoVat * 1.36);
+        const priceWithVat = resolvePriceWithVat(product.priceWithVat, priceNoVat);
         const pkgQty = product.packageQuantity || 1;
         
         const lineTotalNoVat = priceNoVat * pkgQty * qty;

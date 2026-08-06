@@ -4,6 +4,7 @@ import sharp from "sharp";
 import slugify from "slugify";
 import { parse } from "csv-parse/sync";
 import { stringify } from "csv-stringify/sync";
+import { calculatePriceWithVat } from "../lib/pricing";
 
 const ROOT = process.cwd();
 const OUTPUTS = [
@@ -16,6 +17,8 @@ const RAW_IMAGE_DIR = path.join(OUT_DIR, "images-raw");
 const READY_IMAGE_DIR = path.join(OUT_DIR, "images-ready");
 const VIDEO_DIR = path.join(OUT_DIR, "videos");
 const REPORT_DIR = path.join(OUT_DIR, "reports");
+const READY_IMAGE_SIZE = 1400;
+const READY_IMAGE_BACKGROUND = { r: 255, g: 255, b: 255, alpha: 1 };
 
 const CSV_COLUMNS = [
   "image_raw",
@@ -274,7 +277,8 @@ function formatMoney(value: string) {
 
 function priceWithVat(value: string) {
   const price = Number(formatMoney(value));
-  return Number.isFinite(price) && price > 0 ? (price * 1.12).toFixed(2) : "";
+  const calculated = calculatePriceWithVat(price);
+  return calculated ? calculated.toFixed(2) : "";
 }
 
 function splitPaths(value: string) {
@@ -315,10 +319,11 @@ async function copyAndConvertImages(config: SourceConfig, row: SourceRow, baseSl
     if (!fs.existsSync(readyTarget)) {
       await sharp(source)
         .rotate()
-        .resize(1400, 1400, {
-          fit: "inside",
-          withoutEnlargement: true,
+        .resize(READY_IMAGE_SIZE, READY_IMAGE_SIZE, {
+          fit: "contain",
+          background: READY_IMAGE_BACKGROUND,
         })
+        .flatten({ background: READY_IMAGE_BACKGROUND })
         .webp({
           quality: 84,
           effort: 5,

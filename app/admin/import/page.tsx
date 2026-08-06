@@ -9,7 +9,7 @@ const EXAMPLE_JSON = `[
     "name": "Перчатки х/б белые",
     "external_id": "GLV-011",
     "price_without_vat": 150,
-    "price_with_vat": 204,
+    "price_with_vat": 195,
     "unit": "пара",
     "description": "Описание товара",
     "package_type": "мешок",
