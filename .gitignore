@@ -5,3 +5,6 @@
 .env*.local
 
 .vercel
+output
+output_2
+output_merged
