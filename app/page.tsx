@@ -7,6 +7,7 @@ import { Search, ImageIcon, LogIn, ArrowUp, Menu } from 'lucide-react';
 import ProductModal from '@/components/ProductModal';
 import CartModal from '@/components/CartModal';
 import { formatPrice } from '@/lib/utils';
+import { CART_ENABLED } from '@/lib/features';
 
 interface Subcategory {
   id: string;
@@ -172,7 +173,7 @@ export default function CatalogPage() {
   }
 
   return (
-    <div className="min-h-screen pb-[120px]">
+    <div className={CART_ENABLED ? 'min-h-screen pb-[120px]' : 'min-h-screen pb-8'}>
       <header className="bg-gradient-to-br from-gray-900 to-gray-800 text-white px-4 pt-6 pb-[22px] relative">
         <div className="absolute top-4 right-4 sm:right-6">
           <a href="/admin" className="text-white/30 hover:text-white/80 transition-colors flex items-center gap-1.5 text-[13px] font-medium" title="Вход в админ-панель">
@@ -185,7 +186,7 @@ export default function CatalogPage() {
             Каталог хозтоваров
           </h1>
           <p className="m-0 text-gray-300 text-[15px] max-w-[760px]">
-            Выберите нужные товары, добавьте количество и отправьте список менеджеру в WhatsApp.
+            Ознакомьтесь с ассортиментом и характеристиками товаров.
           </p>
         </div>
       </header>
@@ -378,7 +379,7 @@ export default function CatalogPage() {
       </main>
 
       {/* Floating Buttons */}
-      <div className="fixed right-4 bottom-[88px] sm:bottom-[100px] z-40 flex flex-col gap-2">
+      <div className={`fixed right-4 z-40 flex flex-col gap-2 ${CART_ENABLED ? 'bottom-[88px] sm:bottom-[100px]' : 'bottom-4'}`}>
         <button 
           onClick={scrollToCategories}
           className="w-12 h-12 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-full flex items-center justify-center text-gray-700 shadow-lg hover:bg-white hover:text-accent transition-colors lg:hidden"
@@ -398,27 +399,28 @@ export default function CatalogPage() {
         )}
       </div>
 
-      {/* Cart Bottom Bar */}
-      <div className="fixed left-0 right-0 bottom-0 z-50 bg-white border-t border-line px-4 py-3 shadow-[0_-8px_28px_rgba(17,24,39,0.08)]">
-        <div className="max-w-[1120px] mx-auto flex flex-col sm:flex-row gap-3 items-center justify-between">
-          <div className="text-center sm:text-left flex-1">
-            <div className="font-black text-gray-900 text-[19px] leading-none">
-              {totalItems > 0 && totalPrice > 0 ? `Итого: ${formatPrice(totalPrice)}` : totalItems > 0 ? `В корзине: ${totalItems} шт.` : 'Корзина пустая'}
+      {CART_ENABLED && (
+        <div className="fixed left-0 right-0 bottom-0 z-50 bg-white border-t border-line px-4 py-3 shadow-[0_-8px_28px_rgba(17,24,39,0.08)]">
+          <div className="max-w-[1120px] mx-auto flex flex-col sm:flex-row gap-3 items-center justify-between">
+            <div className="text-center sm:text-left flex-1">
+              <div className="font-black text-gray-900 text-[19px] leading-none">
+                {totalItems > 0 && totalPrice > 0 ? `Итого: ${formatPrice(totalPrice)}` : totalItems > 0 ? `В корзине: ${totalItems} шт.` : 'Корзина пустая'}
+              </div>
+              <div className="text-muted text-[13px] font-medium mt-1">
+                {totalItems > 0 
+                  ? `${items.length} позиций — можно отправить заказ` 
+                  : 'Откройте товар и добавьте количество'}
+              </div>
             </div>
-            <div className="text-muted text-[13px] font-medium mt-1">
-              {totalItems > 0 
-                ? `${items.length} позиций — можно отправить заказ` 
-                : 'Откройте товар и добавьте количество'}
-            </div>
+            <button 
+              onClick={() => setIsCartOpen(true)}
+              className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-accent hover:bg-accent-dark text-white font-extrabold text-[15px] transition-colors whitespace-nowrap shadow-sm shadow-accent/20"
+            >
+              Открыть корзину
+            </button>
           </div>
-          <button 
-            onClick={() => setIsCartOpen(true)}
-            className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-accent hover:bg-accent-dark text-white font-extrabold text-[15px] transition-colors whitespace-nowrap shadow-sm shadow-accent/20"
-          >
-            Открыть корзину
-          </button>
         </div>
-      </div>
+      )}
 
       {selectedProduct && (
         <ProductModal 
@@ -427,7 +429,7 @@ export default function CatalogPage() {
         />
       )}
 
-      {isCartOpen && (
+      {CART_ENABLED && isCartOpen && (
         <CartModal onClose={() => setIsCartOpen(false)} />
       )}
     </div>

@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useCartStore, Product } from '@/store/cart';
 import { Plus, Minus, X } from 'lucide-react';
 import { calculatePriceWithVat } from '@/lib/pricing';
+import { CART_ENABLED } from '@/lib/features';
 
 export default function ProductModal({
   product,
@@ -95,30 +96,34 @@ export default function ProductModal({
           </div>
         )}
 
-        <div className="grid grid-cols-[56px_1fr_56px] gap-[10px] items-center my-4">
-          <button
-            onClick={() => setQty(Math.max(1, qty - 1))}
-            className="h-[56px] rounded-2xl border border-line bg-gray-100 flex items-center justify-center text-2xl font-black text-gray-700 hover:bg-gray-200 transition-colors"
-          >
-            <Minus size={20} strokeWidth={3} />
-          </button>
-          <div className="h-[56px] border border-line rounded-2xl flex flex-col items-center justify-center bg-white leading-none">
-            <span className="text-[22px] font-black">{qty}</span>
-          </div>
-          <button
-            onClick={() => setQty(qty + 1)}
-            className="h-[56px] rounded-2xl border border-line bg-gray-100 flex items-center justify-center text-2xl font-black text-gray-700 hover:bg-gray-200 transition-colors"
-          >
-            <Plus size={20} strokeWidth={3} />
-          </button>
-        </div>
+        {CART_ENABLED && (
+          <>
+            <div className="grid grid-cols-[56px_1fr_56px] gap-[10px] items-center my-4">
+              <button
+                onClick={() => setQty(Math.max(1, qty - 1))}
+                className="h-[56px] rounded-2xl border border-line bg-gray-100 flex items-center justify-center text-2xl font-black text-gray-700 hover:bg-gray-200 transition-colors"
+              >
+                <Minus size={20} strokeWidth={3} />
+              </button>
+              <div className="h-[56px] border border-line rounded-2xl flex flex-col items-center justify-center bg-white leading-none">
+                <span className="text-[22px] font-black">{qty}</span>
+              </div>
+              <button
+                onClick={() => setQty(qty + 1)}
+                className="h-[56px] rounded-2xl border border-line bg-gray-100 flex items-center justify-center text-2xl font-black text-gray-700 hover:bg-gray-200 transition-colors"
+              >
+                <Plus size={20} strokeWidth={3} />
+              </button>
+            </div>
 
-        <button
-          onClick={handleAdd}
-          className="w-full h-[56px] rounded-xl bg-accent hover:bg-accent-dark text-white font-extrabold text-[15px] flex items-center justify-center transition-colors"
-        >
-          Добавить в корзину
-        </button>
+            <button
+              onClick={handleAdd}
+              className="w-full h-[56px] rounded-xl bg-accent hover:bg-accent-dark text-white font-extrabold text-[15px] flex items-center justify-center transition-colors"
+            >
+              Добавить в корзину
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
