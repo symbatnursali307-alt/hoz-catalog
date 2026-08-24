@@ -1,170 +1,25 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Save, Settings } from 'lucide-react';
+import { AlertTriangle, Save } from 'lucide-react';
 
-interface SettingsData {
-  companyName: string;
-  catalogTitle: string;
-  catalogDescription: string;
-  whatsappPhone: string;
-  showPrices: boolean;
-  showVatPrices: boolean;
-}
+interface SettingsData { companyName: string; catalogTitle: string; catalogDescription: string; whatsappPhone: string; showPrices: boolean; cartEnabled: boolean }
 
 export default function AdminSettingsPage() {
-  const [form, setForm] = useState<SettingsData>({
-    companyName: '',
-    catalogTitle: '',
-    catalogDescription: '',
-    whatsappPhone: '',
-    showPrices: true,
-    showVatPrices: true,
-  });
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState('');
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    fetch('/api/admin/settings')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data && !data.error) {
-          setForm({
-            companyName: data.companyName || '',
-            catalogTitle: data.catalogTitle || '',
-            catalogDescription: data.catalogDescription || '',
-            whatsappPhone: data.whatsappPhone || '',
-            showPrices: data.showPrices ?? true,
-            showVatPrices: data.showVatPrices ?? true,
-          });
-        }
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
-
-  const handleSave = async () => {
-    setSaving(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      const res = await fetch('/api/admin/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Ошибка сохранения');
-      }
-
-      setSuccess('Настройки сохранены');
-    } catch (err: any) {
-      setError(err.message || 'Ошибка сервера');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (loading) {
-    return <div className="text-gray-400 font-bold animate-pulse py-20 text-center">Загрузка...</div>;
-  }
-
-  const inputClass = 'w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-accent bg-white transition-colors';
-  const labelClass = 'block text-sm font-bold text-gray-700 mb-1.5';
-
-  return (
-    <div className="max-w-[600px]">
-      <h2 className="text-xl font-bold text-gray-900 mb-6">Настройки каталога</h2>
-
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <div className="grid gap-5">
-          <div>
-            <label className={labelClass}>Название компании</label>
-            <input
-              value={form.companyName}
-              onChange={(e) => setForm({ ...form, companyName: e.target.value })}
-              className={inputClass}
-              placeholder="Каталог хозтоваров"
-            />
-          </div>
-
-          <div>
-            <label className={labelClass}>Заголовок каталога</label>
-            <input
-              value={form.catalogTitle}
-              onChange={(e) => setForm({ ...form, catalogTitle: e.target.value })}
-              className={inputClass}
-              placeholder="Каталог хозтоваров"
-            />
-          </div>
-
-          <div>
-            <label className={labelClass}>Описание каталога</label>
-            <textarea
-              value={form.catalogDescription}
-              onChange={(e) => setForm({ ...form, catalogDescription: e.target.value })}
-              className={`${inputClass} min-h-[80px] resize-y`}
-              placeholder="Описание для SEO..."
-            />
-          </div>
-
-          <div>
-            <label className={labelClass}>Номер WhatsApp</label>
-            <input
-              value={form.whatsappPhone}
-              onChange={(e) => setForm({ ...form, whatsappPhone: e.target.value })}
-              className={inputClass}
-              placeholder="77773042030"
-            />
-            <p className="text-xs text-gray-400 mt-1">Только цифры, без + и пробелов</p>
-          </div>
-
-          <div className="border-t border-gray-100 pt-5">
-            <h4 className="font-bold text-gray-700 text-sm mb-3">Отображение</h4>
-            <div className="space-y-3">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.showPrices}
-                  onChange={(e) => setForm({ ...form, showPrices: e.target.checked })}
-                  className="w-5 h-5 rounded border-gray-300 text-accent"
-                />
-                <span className="text-sm text-gray-700">Показывать цены в каталоге</span>
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.showVatPrices}
-                  onChange={(e) => setForm({ ...form, showVatPrices: e.target.checked })}
-                  className="w-5 h-5 rounded border-gray-300 text-accent"
-                />
-                <span className="text-sm text-gray-700">Показывать цены с НДС</span>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        {error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm font-medium">{error}</div>
-        )}
-        {success && (
-          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-xl text-green-600 text-sm font-medium">{success}</div>
-        )}
-
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="mt-5 w-full h-[48px] rounded-xl bg-accent hover:bg-accent-dark disabled:opacity-50 text-white font-bold text-sm flex items-center justify-center gap-2 transition-colors"
-        >
-          {saving ? 'Сохранение...' : <><Save size={16} />Сохранить настройки</>}
-        </button>
-      </div>
-    </div>
-  );
+  const [form, setForm] = useState<SettingsData>({ companyName: '', catalogTitle: '', catalogDescription: '', whatsappPhone: '', showPrices: true, cartEnabled: false });
+  const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [message, setMessage] = useState(''); const [error, setError] = useState('');
+  useEffect(() => { fetch('/api/admin/settings').then((response) => response.json()).then((data) => setForm({ companyName: data.companyName || '', catalogTitle: data.catalogTitle || '', catalogDescription: data.catalogDescription || '', whatsappPhone: data.whatsappPhone || '', showPrices: data.showPrices !== false, cartEnabled: data.cartEnabled === true })).finally(() => setLoading(false)); }, []);
+  const save = async () => { setSaving(true); setError(''); setMessage(''); try { const response = await fetch('/api/admin/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Ошибка сохранения'); setMessage('Настройки сохранены'); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Ошибка сервера'); } finally { setSaving(false); } };
+  if (loading) return <div className="py-20 text-center text-gray-400">Загрузка...</div>;
+  const input = 'w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-accent'; const label = 'mb-1.5 block text-sm font-bold';
+  return <div className="max-w-[700px]"><h2 className="mb-6 text-xl font-bold">Настройки каталога</h2><div className="space-y-5 rounded-2xl border bg-white p-6 shadow-sm">
+    <div><label className={label}>Название компании</label><input value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} className={input} /></div>
+    <div><label className={label}>Заголовок каталога</label><input value={form.catalogTitle} onChange={(event) => setForm({ ...form, catalogTitle: event.target.value })} className={input} /></div>
+    <div><label className={label}>Описание каталога</label><textarea value={form.catalogDescription} onChange={(event) => setForm({ ...form, catalogDescription: event.target.value })} className={`${input} min-h-24`} /></div>
+    <div className="space-y-3 border-t pt-5"><label className="flex items-center gap-3 text-sm font-bold"><input type="checkbox" checked={form.showPrices} onChange={(event) => setForm({ ...form, showPrices: event.target.checked })} className="h-5 w-5" />Показывать цены с НДС</label><label className="flex items-center gap-3 text-sm font-bold"><input type="checkbox" checked={form.cartEnabled} onChange={(event) => setForm({ ...form, cartEnabled: event.target.checked })} className="h-5 w-5" />Включить корзину и переход в WhatsApp</label></div>
+    {form.cartEnabled && <div className="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"><AlertTriangle size={18} className="shrink-0" />Включайте только после заполнения реальной цены с НДС и фасовки товаров. Неполные товары останутся недоступны для заказа.</div>}
+    <div className="rounded-xl bg-gray-50 p-3 text-xs text-gray-500">Номера и персональные ссылки настраиваются в разделе «Менеджеры». Старый резервный номер: {form.whatsappPhone || 'не задан'}.</div>
+    {error && <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>}{message && <div className="rounded-xl bg-green-50 p-3 text-sm text-green-700">{message}</div>}
+    <button onClick={() => void save()} disabled={saving} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent font-bold text-white disabled:opacity-50"><Save size={17} />{saving ? 'Сохранение...' : 'Сохранить'}</button>
+  </div></div>;
 }

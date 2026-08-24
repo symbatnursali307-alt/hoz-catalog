@@ -10,3 +10,11 @@ dist
 output
 output_2
 output_merged
+
+# Local recovery/deployment artifacts (may contain production data or secrets)
+_recovery_backup_*/
+.tools/
+.pnpm-store/
+__pycache__/
+*.pyc
+_deploy_bundle*.tar.gz

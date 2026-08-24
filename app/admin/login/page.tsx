@@ -57,7 +57,7 @@ export default function AdminLoginPage() {
               type="text"
               value={login}
               onChange={(e) => setLogin(e.target.value)}
-              placeholder="admin"
+              placeholder="admin или номер телефона"
               autoComplete="username"
               className="w-full px-4 py-3 border border-gray-200 rounded-xl text-[15px] outline-none focus:border-accent transition-colors bg-gray-50"
               required

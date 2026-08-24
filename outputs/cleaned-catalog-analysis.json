@@ -1,0 +1,75 @@
+{
+  "generatedAt": "2026-08-20T22:11:40.007997+00:00",
+  "source": {
+    "workbook": "C:\\Users\\Lenovo\\Downloads\\Каталог_товаров_очищенный_2026-08-21.xlsx",
+    "workbookSha256": "8a64bd12627090a0e64efe80a5d155b9cfab0ef8e2806f36fccf8c062fc5ddff",
+    "snapshot": "C:\\Users\\Lenovo\\Documents\\ChatGPT\\каталог хоз\\.tools\\catalog-products-review-pre-import.json",
+    "snapshotSha256": "ec626ae5fc8c930c4b6705cd91a5883facc08921cbe59428844dace30392da40",
+    "snapshotGeneratedAt": "2026-08-20T22:05:53.206Z"
+  },
+  "counts": {
+    "production": 450,
+    "workbookProducts": 445,
+    "workbookReviewRows": 366,
+    "workbookDeclaredDuplicates": 5,
+    "safeCandidateUpdates": 445,
+    "unchanged": 0,
+    "ambiguous": 0,
+    "new": 0,
+    "omittedFromWorkbook": 5,
+    "pendingReviewDirectives": 366
+  },
+  "fieldChangeCounts": {
+    "characteristics": 445,
+    "name": 440,
+    "shortDescription": 409,
+    "description": 409,
+    "fullDescription": 52,
+    "categoryId": 6
+  },
+  "validationCounts": {},
+  "advisoryCounts": {
+    "technical_full_description_replaced": 52,
+    "create_subcategory": 6,
+    "name_too_generic": 2
+  },
+  "reviewStatusCounts": {
+    "products": {
+      "Нужна ручная проверка": 361,
+      "Готово": 84
+    },
+    "manualSheet": {
+      "Нужна ручная проверка": 361,
+      "Подтверждённый дубль": 5
+    }
+  },
+  "omissions": {
+    "all": [
+      "WA1-0059",
+      "WA1-0060",
+      "WA2-0015",
+      "WA2-0048",
+      "WA2-0050"
+    ],
+    "declaredDuplicates": [
+      "WA1-0059",
+      "WA1-0060",
+      "WA2-0015",
+      "WA2-0048",
+      "WA2-0050"
+    ],
+    "undeclared": [],
+    "declaredButStillPresent": [],
+    "action": "preserve_in_production"
+  },
+  "newIds": [],
+  "unchangedIds": [],
+  "ambiguousItems": [],
+  "diagnosticColumnsIgnored": [
+    "duplicate_status",
+    "image_sha256",
+    "original_name",
+    "review_reason",
+    "review_status"
+  ]
+}

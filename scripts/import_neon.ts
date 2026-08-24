@@ -96,6 +96,7 @@ async function main() {
       const externalId = row.externalId?.trim() || `ID-${rowNum}`;
 
       const data = {
+        slug: String(externalId).toLowerCase().replace(/[^a-z0-9-]+/g, "-") || `product-${rowNum}`,
         name: row.name.trim(),
         description: row.description?.trim() || null,
         unit: row.unit?.trim() || null,

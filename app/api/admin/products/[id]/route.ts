@@ -1,149 +1,108 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { checkAdminAuth } from '@/lib/admin-auth';
-import { calculatePriceWithVat } from '@/lib/pricing';
+import { isProductOrderable } from '@/lib/catalog';
+import { makeSlug, normalizeProductData, productPublicationErrors, uniqueProductSlug } from '@/lib/product-input';
+import { getProductQualityIssues } from '@/lib/product-quality';
+import { prisma } from '@/lib/prisma';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const isAuthed = await checkAdminAuth(request);
-  if (!isAuthed) {
-    return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+  if (!(await checkAdminAuth(request))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-
-  try {
-    const { id } = await params;
-    const product = await prisma.product.findUnique({
-      where: { id },
-      include: { category: true },
-    });
-
-    if (!product) {
-      return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 });
-    }
-
-    return NextResponse.json(product);
-  } catch (error) {
-    console.error('Failed to fetch product:', error);
-    return NextResponse.json({ success: false, error: 'Failed to fetch product' }, { status: 500 });
-  }
+  const { id } = await params;
+  const product = await prisma.product.findUnique({
+    where: { id },
+    include: { category: true, subcategory: true, review: true },
+  });
+  if (!product) return NextResponse.json({ error: 'Товар не найден' }, { status: 404 });
+  return NextResponse.json({ ...product, qualityIssues: getProductQualityIssues(product) });
 }
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const isAuthed = await checkAdminAuth(request);
-  if (!isAuthed) {
-    return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+  if (!(await checkAdminAuth(request))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
     const { id } = await params;
-    const data = await request.json();
-    const priceWithoutVat = data.priceWithoutVat ? parseInt(data.priceWithoutVat) : null;
-    const priceWithVat = data.priceWithVat ? parseFloat(data.priceWithVat) : calculatePriceWithVat(priceWithoutVat);
+    const existing = await prisma.product.findUnique({ where: { id } });
+    if (!existing) return NextResponse.json({ error: 'Товар не найден' }, { status: 404 });
 
-    const product = await prisma.product.update({
-      where: { id },
-      data: {
-        externalId: data.externalId || null,
-        categoryId: data.categoryId,
-        subcategoryId: data.subcategoryId || null,
-        name: data.name,
-        description: data.description || null,
-        unit: data.unit || null,
-        priceWithoutVat,
-        priceWithVat,
-        price: data.priceWithoutVat ? `${data.priceWithoutVat} тг.` : null,
-        packageType: data.packageType || null,
-        packageQuantity: data.packageQuantity ? parseInt(data.packageQuantity) : null,
-        packageUnit: data.packageUnit || null,
-        photo: data.photo || null,
-        sortOrder: data.sortOrder ? parseInt(data.sortOrder) : 0,
-        isActive: data.isActive !== undefined ? data.isActive : true,
-      },
-    });
+    const body = await request.json();
+    const baseSlug = makeSlug(body.slug, body.externalId || body.name || existing.slug);
+    const slug = await uniqueProductSlug(baseSlug, id);
+    const data = normalizeProductData(body, slug);
+    const validationErrors = productPublicationErrors(data);
+    if (!existing.isActive && data.isActive && validationErrors.length) {
+      return NextResponse.json(
+        { success: false, error: `Для публикации заполните: ${validationErrors.join(', ')}` },
+        { status: 400 },
+      );
+    }
 
-    return NextResponse.json({ success: true, product });
-  } catch (error) {
+    const product = await prisma.product.update({ where: { id }, data });
+    const qualityIssues = getProductQualityIssues(product);
+    if (!qualityIssues.length) {
+      await prisma.productReview.updateMany({
+        where: { productId: id, status: 'PENDING' },
+        data: { status: 'RESOLVED', resolvedAt: new Date() },
+      });
+    }
+    return NextResponse.json({ success: true, product, validationErrors, qualityIssues });
+  } catch (error: any) {
+    const duplicate = error?.code === 'P2002';
     console.error('Failed to update product:', error);
-    return NextResponse.json({ success: false, error: 'Failed to update product' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: duplicate ? 'Артикул, slug или Meta ID уже используется' : error?.message || 'Ошибка сохранения' },
+      { status: duplicate ? 409 : 400 },
+    );
   }
 }
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const isAuthed = await checkAdminAuth(request);
-  if (!isAuthed) {
-    return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+  if (!(await checkAdminAuth(request))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  try {
-    const { id } = await params;
-    const data = await request.json();
+  const { id } = await params;
+  const body = await request.json();
+  const existing = await prisma.product.findUnique({ where: { id } });
+  if (!existing) return NextResponse.json({ error: 'Товар не найден' }, { status: 404 });
 
-    const updateData: any = {};
-    if (data.externalId !== undefined) updateData.externalId = data.externalId;
-    if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
-    if (data.subcategoryId !== undefined) updateData.subcategoryId = data.subcategoryId;
-    if (data.name !== undefined) updateData.name = data.name;
-    if (data.description !== undefined) updateData.description = data.description;
-    if (data.unit !== undefined) updateData.unit = data.unit;
-    if (data.priceWithoutVat !== undefined) {
-      updateData.priceWithoutVat = data.priceWithoutVat ? parseInt(data.priceWithoutVat) : null;
-      if (data.priceWithVat === undefined) {
-        updateData.priceWithVat = calculatePriceWithVat(updateData.priceWithoutVat);
-      }
-    }
-    if (data.priceWithVat !== undefined) {
-      updateData.priceWithVat = data.priceWithVat
-        ? parseFloat(data.priceWithVat)
-        : calculatePriceWithVat(updateData.priceWithoutVat);
-    }
-    if (data.price !== undefined) updateData.price = data.price;
-    if (data.photo !== undefined) updateData.photo = data.photo;
-    if (data.packageType !== undefined) updateData.packageType = data.packageType;
-    if (data.packageQuantity !== undefined) updateData.packageQuantity = data.packageQuantity ? parseInt(data.packageQuantity) : null;
-    if (data.packageUnit !== undefined) updateData.packageUnit = data.packageUnit;
-    if (data.sortOrder !== undefined) updateData.sortOrder = parseInt(data.sortOrder);
-    if (data.isActive !== undefined) updateData.isActive = data.isActive;
-
-    const product = await prisma.product.update({
-      where: { id },
-      data: updateData,
-    });
-
-    return NextResponse.json({ success: true, product });
-  } catch (error) {
-    console.error('Failed to update product:', error);
-    return NextResponse.json({ success: false, error: 'Failed to update product' }, { status: 500 });
+  if (body.isActive === true && !isProductOrderable(existing)) {
+    return NextResponse.json(
+      { success: false, error: 'Нельзя включить товар без цены с НДС, единицы и полной фасовки' },
+      { status: 409 },
+    );
   }
+
+  const data: { isActive?: boolean; isFeatured?: boolean; sortOrder?: number } = {};
+  if (typeof body.isActive === 'boolean') data.isActive = body.isActive;
+  if (typeof body.isFeatured === 'boolean') data.isFeatured = body.isFeatured;
+  if (Number.isFinite(Number(body.sortOrder))) data.sortOrder = Math.round(Number(body.sortOrder));
+  if (!Object.keys(data).length) return NextResponse.json({ error: 'Нет допустимых полей' }, { status: 400 });
+
+  const product = await prisma.product.update({ where: { id }, data });
+  return NextResponse.json({ success: true, product });
 }
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const isAuthed = await checkAdminAuth(request);
-  if (!isAuthed) {
-    return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+  if (!(await checkAdminAuth(request))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-
-  try {
-    const { id } = await params;
-    // Soft delete
-    const product = await prisma.product.update({
-      where: { id },
-      data: { isActive: false },
-    });
-
-    return NextResponse.json({ success: true, product });
-  } catch (error) {
-    console.error('Failed to hide product:', error);
-    return NextResponse.json({ success: false, error: 'Failed to hide product' }, { status: 500 });
-  }
+  const { id } = await params;
+  const product = await prisma.product.update({ where: { id }, data: { isActive: false } });
+  return NextResponse.json({ success: true, product });
 }

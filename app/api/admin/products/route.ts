@@ -1,23 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { checkAdminAuth } from '@/lib/admin-auth';
-import { calculatePriceWithVat } from '@/lib/pricing';
+import { makeSlug, normalizeProductData, productPublicationErrors, uniqueProductSlug } from '@/lib/product-input';
+import { getProductQualityIssues, summarizeProductQuality } from '@/lib/product-quality';
+import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
-  const isAuthed = await checkAdminAuth(request);
-  if (!isAuthed) {
-    return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+  if (!(await checkAdminAuth(request))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
     const products = await prisma.product.findMany({
-      orderBy: { sortOrder: 'asc' },
-      include: {
-        category: true,
-      },
+      orderBy: [{ isFeatured: 'desc' }, { sortOrder: 'asc' }, { name: 'asc' }],
+      include: { category: true, subcategory: true, review: true },
     });
-
-    return NextResponse.json(products);
+    return NextResponse.json(products.map((product) => {
+      const issues = getProductQualityIssues(product);
+      return { ...product, quality: summarizeProductQuality(issues) };
+    }));
   } catch (error) {
     console.error('Failed to fetch admin products:', error);
     return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 });
@@ -25,39 +25,30 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const isAuthed = await checkAdminAuth(request);
-  if (!isAuthed) {
-    return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+  if (!(await checkAdminAuth(request))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const data = await request.json();
-    const priceWithoutVat = data.priceWithoutVat ? parseInt(data.priceWithoutVat) : null;
-    const priceWithVat = data.priceWithVat ? parseFloat(data.priceWithVat) : calculatePriceWithVat(priceWithoutVat);
-
-    const product = await prisma.product.create({
-      data: {
-        externalId: data.externalId || null,
-        categoryId: data.categoryId,
-        subcategoryId: data.subcategoryId || null,
-        name: data.name,
-        description: data.description || null,
-        unit: data.unit || null,
-        priceWithoutVat,
-        priceWithVat,
-        price: data.priceWithoutVat ? `${data.priceWithoutVat} тг.` : null,
-        packageType: data.packageType || null,
-        packageQuantity: data.packageQuantity ? parseInt(data.packageQuantity) : null,
-        packageUnit: data.packageUnit || null,
-        photo: data.photo || null,
-        sortOrder: data.sortOrder ? parseInt(data.sortOrder) : 0,
-        isActive: data.isActive !== undefined ? data.isActive : true,
-      },
-    });
-
-    return NextResponse.json({ success: true, product });
-  } catch (error) {
+    const body = await request.json();
+    const baseSlug = makeSlug(body.slug, body.externalId || body.name || 'product');
+    const slug = await uniqueProductSlug(baseSlug);
+    const data = normalizeProductData(body, slug);
+    const validationErrors = productPublicationErrors(data);
+    if (data.isActive && validationErrors.length) {
+      return NextResponse.json(
+        { success: false, error: `Для публикации заполните: ${validationErrors.join(', ')}` },
+        { status: 400 },
+      );
+    }
+    const product = await prisma.product.create({ data });
+    return NextResponse.json({ success: true, product, validationErrors }, { status: 201 });
+  } catch (error: any) {
+    const duplicate = error?.code === 'P2002';
     console.error('Failed to create product:', error);
-    return NextResponse.json({ success: false, error: 'Failed to create product' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: duplicate ? 'Артикул или Meta ID уже используется' : error?.message || 'Ошибка сохранения' },
+      { status: duplicate ? 409 : 400 },
+    );
   }
 }

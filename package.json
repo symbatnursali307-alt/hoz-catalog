@@ -10,7 +10,14 @@
     "lint": "next lint",
     "convert:images": "tsx scripts/convert-images.ts",
     "upload:images": "tsx scripts/upload-images.ts",
-    "import:products": "tsx scripts/import-products.ts"
+    "import:products": "tsx scripts/import-products.ts",
+    "analyze:packaging": "tsx scripts/analyze-package-descriptions.ts",
+    "test:packaging": "tsx scripts/test-package-extraction.ts",
+    "test:quality": "tsx scripts/test-product-quality.ts",
+    "test:pwa": "tsx scripts/test-pwa-install.ts",
+    "test:pricing": "tsx scripts/test-pricing.ts",
+    "test:orders": "tsx scripts/test-orders.ts",
+    "generate:pwa-icons": "node scripts/generate-pwa-icons.mjs"
   },
   "keywords": [],
   "author": "",

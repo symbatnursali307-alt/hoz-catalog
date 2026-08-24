@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Package, FolderTree, Users, Eye, EyeOff, TrendingUp } from 'lucide-react';
+import { Package, FolderTree, Users, Eye, EyeOff, ShieldAlert } from 'lucide-react';
 
 interface Stats {
   totalProducts: number;
@@ -10,8 +10,13 @@ interface Stats {
   hiddenProducts: number;
   totalCategories: number;
   totalClients: number;
+  totalCartSubmissions: number;
+  ordersVisible: boolean;
+  productsNeedingReview: number;
+  productsWithQualityErrors: number;
   recentProducts: { id: string; name: string; photo: string | null; createdAt: string; isActive: boolean }[];
   recentClients: { id: string; name: string; city: string; phone: string; createdAt: string; _count: { selectedProducts: number } }[];
+  recentCartSubmissions: { id: string; orderNumber: number; publicId: string; customerName: string | null; phone: string; totalAmount: number; createdAt: string; manager: { name: string } | null }[];
 }
 
 function StatCard({ title, value, icon: Icon, color }: { title: string; value: number; icon: any; color: string }) {
@@ -57,12 +62,15 @@ export default function AdminDashboard() {
   return (
     <div className="max-w-[1200px]">
       {/* Stats cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
         <StatCard title="Всего товаров" value={stats.totalProducts} icon={Package} color="bg-blue-500" />
         <StatCard title="Активных" value={stats.activeProducts} icon={Eye} color="bg-green-500" />
         <StatCard title="Скрытых" value={stats.hiddenProducts} icon={EyeOff} color="bg-gray-400" />
         <StatCard title="Категорий" value={stats.totalCategories} icon={FolderTree} color="bg-purple-500" />
-        <StatCard title="Заявок" value={stats.totalClients} icon={Users} color="bg-amber-500" />
+        {stats.ordersVisible
+          ? <StatCard title="Заказов" value={stats.totalCartSubmissions} icon={Users} color="bg-amber-500" />
+          : <StatCard title="Клиентов" value={stats.totalClients} icon={Users} color="bg-amber-500" />}
+        <Link href="/admin/product-review" className="no-underline"><StatCard title="Требуют проверки" value={stats.productsNeedingReview} icon={ShieldAlert} color={stats.productsWithQualityErrors ? 'bg-red-500' : 'bg-amber-500'} /></Link>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
@@ -102,35 +110,49 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Recent Clients */}
+        {/* Recent orders remain hidden until the feature is enabled. */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
           <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="font-bold text-gray-900">Последние заявки</h3>
-            <Link href="/admin/clients" className="text-accent text-sm font-medium hover:underline">
-              Все заявки →
+            <h3 className="font-bold text-gray-900">{stats.ordersVisible ? 'Последние заказы' : 'Последние клиенты'}</h3>
+            <Link href={stats.ordersVisible ? '/admin/cart-submissions' : '/admin/clients'} className="text-accent text-sm font-medium hover:underline">
+              {stats.ordersVisible ? 'Все заказы →' : 'Все клиенты →'}
             </Link>
           </div>
           <div className="divide-y divide-gray-50">
-            {stats.recentClients.length === 0 ? (
-              <div className="p-5 text-gray-400 text-sm text-center">Заявок пока нет</div>
-            ) : (
-              stats.recentClients.map((c) => (
-                <div key={c.id} className="px-5 py-3 flex items-center gap-3">
+            {stats.ordersVisible ? (stats.recentCartSubmissions.length === 0 ? (
+              <div className="p-5 text-gray-400 text-sm text-center">Заказов пока нет</div>
+            ) :
+              stats.recentCartSubmissions.map((c) => (
+                <Link href={`/admin/cart-submissions/${c.id}`} key={c.id} className="px-5 py-3 flex items-center gap-3 text-gray-900 no-underline hover:bg-gray-50">
                   <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
                     <Users size={16} className="text-amber-500" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-900 truncate">{c.name}</div>
+                    <div className="text-sm font-medium text-gray-900 truncate">Заказ №{c.orderNumber}{c.customerName ? ` · ${c.customerName}` : ''}</div>
                     <div className="text-xs text-gray-400">
-                      {c.city} · {c.phone}
+                      {c.manager?.name || 'Без менеджера'} · {c.phone || 'без телефона'}
                     </div>
                   </div>
                   <span className="text-xs font-bold px-2 py-1 rounded-full bg-blue-50 text-blue-600">
-                    {c._count.selectedProducts} товаров
+                    {Math.round(c.totalAmount).toLocaleString('ru-RU')} ₸
                   </span>
+                </Link>
+              ))) : (stats.recentClients.length === 0 ? (
+              <div className="p-5 text-gray-400 text-sm text-center">Клиентов пока нет</div>
+            ) : stats.recentClients.map((client) => (
+              <Link href={`/admin/clients/${client.id}`} key={client.id} className="px-5 py-3 flex items-center gap-3 text-gray-900 no-underline hover:bg-gray-50">
+                <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
+                  <Users size={16} className="text-amber-500" />
                 </div>
-              ))
-            )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-900 truncate">{client.name}</div>
+                  <div className="text-xs text-gray-400">{client.city} · {client.phone}</div>
+                </div>
+                <span className="text-xs font-bold px-2 py-1 rounded-full bg-blue-50 text-blue-600">
+                  {client._count.selectedProducts} товаров
+                </span>
+              </Link>
+            )))}
           </div>
         </div>
       </div>

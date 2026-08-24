@@ -1,398 +1,205 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Save, ArrowLeft } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
 
-interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  subcategories?: Subcategory[];
-}
+interface Subcategory { id: string; name: string; slug: string }
+interface Category { id: string; name: string; slug: string; subcategories?: Subcategory[] }
+interface ProductFormProps { productId?: string }
+interface QualityIssue { code: string; severity: 'error' | 'warning'; title: string; details: string }
 
-interface Subcategory {
-  id: string;
-  name: string;
-  slug: string;
-}
+const emptyForm = {
+  name: '', slug: '', categoryId: '', subcategoryId: '', externalId: '', metaCatalogId: '',
+  priceWithVat: '', unitName: '', packageType: '', unitsPerPackage: '', packageUnit: '', minOrderPackages: '1',
+  shortDescription: '', fullDescription: '', characteristics: '', searchKeywords: '', buyerHint: '',
+  imageUrl: '', brand: '', googleProductCategory: '', fbProductCategory: '', sortOrder: '0',
+  isFeatured: false, isActive: false,
+};
 
-interface ProductFormProps {
-  productId?: string; // If provided, we're editing
+type FormState = typeof emptyForm;
+
+function characteristicsToText(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
+  return Object.entries(value as Record<string, unknown>).map(([key, item]) => `${key}: ${String(item)}`).join('\n');
 }
 
 function ProductFormInner({ productId }: ProductFormProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const returnTo = searchParams.get('return_to') || '/admin/products';
-  
-  const isEditing = !!productId;
-
+  const returnTo = useSearchParams().get('return_to') || '/admin/products';
   const [categories, setCategories] = useState<Category[]>([]);
+  const [form, setForm] = useState<FormState>(emptyForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-
-  const [form, setForm] = useState({
-    name: '',
-    categoryId: '',
-    subcategoryId: '',
-    externalId: '',
-    priceWithoutVat: '',
-    priceWithVat: '',
-    unit: '',
-    description: '',
-    packageType: '',
-    packageQuantity: '',
-    packageUnit: '',
-    photo: '',
-    sortOrder: '',
-    isActive: true,
-  });
-
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+  const [qualityIssues, setQualityIssues] = useState<QualityIssue[]>([]);
+  const [reviewNote, setReviewNote] = useState('');
 
   useEffect(() => {
-    // Load categories
-    fetch('/api/admin/categories')
-      .then((r) => r.json())
-      .then((data) => {
+    const requests: Promise<unknown>[] = [
+      fetch('/api/admin/categories').then((response) => response.json()).then((data) => {
         if (Array.isArray(data)) setCategories(data);
-      })
-      .catch(() => {});
-
-    // If editing, load product
+      }),
+    ];
     if (productId) {
-      fetch(`/api/admin/products/${productId}`)
-        .then((r) => r.json())
-        .then((data) => {
-          if (data && data.id) {
-            setForm({
-              name: data.name || '',
-              categoryId: data.categoryId || '',
-              subcategoryId: data.subcategoryId || '',
-              externalId: data.externalId || '',
-              priceWithoutVat: data.priceWithoutVat?.toString() || '',
-              priceWithVat: data.priceWithVat?.toString() || '',
-              unit: data.unit || '',
-              description: data.description || '',
-              packageType: data.packageType || '',
-              packageQuantity: data.packageQuantity?.toString() || '',
-              packageUnit: data.packageUnit || '',
-              photo: data.photo || '',
-              sortOrder: data.sortOrder?.toString() || '',
-              isActive: data.isActive ?? true,
-            });
-          }
-          setLoading(false);
-        })
-        .catch(() => setLoading(false));
-    } else {
-      setLoading(false);
+      requests.push(fetch(`/api/admin/products/${productId}`).then((response) => response.json()).then((data) => {
+        if (!data?.id) throw new Error(data?.error || 'Товар не найден');
+        setQualityIssues(Array.isArray(data.qualityIssues) ? data.qualityIssues : []);
+        setReviewNote(data.review?.status === 'PENDING' ? data.review.note || 'Ручная проверка' : '');
+        setForm({
+          name: data.name || '', slug: data.slug || '', categoryId: data.categoryId || '',
+          subcategoryId: data.subcategoryId || '', externalId: data.externalId || '',
+          metaCatalogId: data.metaCatalogId || '', priceWithVat: data.priceWithVat?.toString() || '',
+          unitName: data.unitName || data.unit || '', packageType: data.packageType || '',
+          unitsPerPackage: (data.unitsPerPackage ?? data.packageQuantity)?.toString() || '',
+          packageUnit: data.packageUnit || '', minOrderPackages: data.minOrderPackages?.toString() || '1',
+          shortDescription: data.shortDescription || data.description || '',
+          fullDescription: data.fullDescription || data.description || '',
+          characteristics: characteristicsToText(data.characteristics), searchKeywords: data.searchKeywords || '',
+          buyerHint: data.buyerHint || '', imageUrl: data.imageUrl || data.photo || '', brand: data.brand || '',
+          googleProductCategory: data.googleProductCategory || '', fbProductCategory: data.fbProductCategory || '',
+          sortOrder: data.sortOrder?.toString() || '0', isFeatured: Boolean(data.isFeatured), isActive: Boolean(data.isActive),
+        });
+      }));
     }
+    Promise.all(requests).catch((reason) => setError(reason instanceof Error ? reason.message : 'Ошибка загрузки')).finally(() => setLoading(false));
   }, [productId]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
-    if (type === 'checkbox') {
-      setForm((prev) => ({ ...prev, [name]: (e.target as HTMLInputElement).checked }));
-    } else {
-      setForm((prev) => {
-        const newForm = { ...prev, [name]: value };
-        if (name === 'categoryId') {
-          newForm.subcategoryId = ''; // Reset subcategory when category changes
-        }
-        return newForm;
-      });
-    }
+  const selectedCategory = categories.find((category) => category.id === form.categoryId);
+  const publicationErrors = useMemo(() => {
+    const missing: string[] = [];
+    if (!form.name.trim()) missing.push('название');
+    if (!form.categoryId) missing.push('категория');
+    if (!(Number(form.priceWithVat) > 0)) missing.push('цена с НДС');
+    if (!form.unitName.trim()) missing.push('единица измерения');
+    if (!form.packageType.trim()) missing.push('тип упаковки');
+    if (!(Number(form.unitsPerPackage) > 0)) missing.push('количество в упаковке');
+    return missing;
+  }, [form]);
+
+  const change = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = event.target;
+    const nextValue = type === 'checkbox' ? (event.target as HTMLInputElement).checked : value;
+    setForm((current) => ({ ...current, [name]: nextValue, ...(name === 'categoryId' ? { subcategoryId: '' } : {}) }));
   };
 
-  const handleFileDrop = async (e: React.DragEvent<HTMLDivElement> | React.ChangeEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    let file: File | null = null;
-    
-    if ('dataTransfer' in e) {
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        file = e.dataTransfer.files[0];
-      }
-    } else if (e.target.files && e.target.files.length > 0) {
-      file = e.target.files[0];
-    }
-
+  const upload = async (event: React.ChangeEvent<HTMLInputElement> | React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const file = 'dataTransfer' in event ? event.dataTransfer.files?.[0] : event.target.files?.[0];
     if (!file) return;
-
-    setUploading(true);
-    setError('');
-
-    const formData = new FormData();
-    formData.append('file', file);
-
+    setUploading(true); setError('');
     try {
-      const res = await fetch('/api/admin/upload/image', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Ошибка загрузки');
-      }
-
-      setForm((prev) => ({ ...prev, photo: data.url }));
-    } catch (err: any) {
-      setError(err.message || 'Ошибка сервера при загрузке');
-    } finally {
-      setUploading(false);
-    }
+      const body = new FormData(); body.append('file', file);
+      const response = await fetch('/api/admin/upload/image', { method: 'POST', body });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Ошибка загрузки');
+      setForm((current) => ({ ...current, imageUrl: data.url }));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Ошибка загрузки');
+    } finally { setUploading(false); }
   };
 
-  const handleDragOver = (e: React.DragEvent) => e.preventDefault();
-
-  const selectedCategory = categories.find((c) => c.id === form.categoryId);
-  const subcategories = selectedCategory?.subcategories || [];
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-
-    if (!form.name.trim()) {
-      setError('Название обязательно');
-      return;
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault(); setError('');
+    if (form.isActive && publicationErrors.length) {
+      setError(`Нельзя опубликовать товар: заполните ${publicationErrors.join(', ')}`); return;
     }
-    if (!form.categoryId) {
-      setError('Выберите категорию');
-      return;
-    }
-
     setSaving(true);
-
     try {
-      const url = isEditing ? `/api/admin/products/${productId}` : '/api/admin/products';
-      const method = isEditing ? 'PUT' : 'POST';
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+      const response = await fetch(productId ? `/api/admin/products/${productId}` : '/api/admin/products', {
+        method: productId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
       });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Ошибка сохранения');
-      }
-
-      setSuccess(isEditing ? 'Товар обновлён' : 'Товар добавлен');
-
-      if (!isEditing) {
-        setTimeout(() => router.push(returnTo), 1000);
-      } else {
-        setTimeout(() => router.push(returnTo), 1000);
-      }
-    } catch (err: any) {
-      setError(err.message || 'Ошибка сервера');
-    } finally {
-      setSaving(false);
-    }
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Ошибка сохранения');
+      router.push(returnTo); router.refresh();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Ошибка сервера');
+    } finally { setSaving(false); }
   };
 
-  if (loading) {
-    return <div className="text-gray-400 font-bold animate-pulse py-20 text-center">Загрузка...</div>;
-  }
-
-  const inputClass = 'w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-accent bg-white transition-colors';
-  const labelClass = 'block text-sm font-bold text-gray-700 mb-1.5';
+  if (loading) return <div className="py-20 text-center font-bold text-gray-400 animate-pulse">Загрузка...</div>;
+  const input = 'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-accent';
+  const label = 'mb-1.5 block text-sm font-bold text-gray-700';
 
   return (
-    <div className="max-w-[700px]">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href={returnTo} className="text-gray-400 hover:text-gray-600 transition-colors">
-          <ArrowLeft size={20} />
-        </Link>
-        <h2 className="text-xl font-bold text-gray-900">
-          {isEditing ? 'Редактирование товара' : 'Новый товар'}
-        </h2>
-      </div>
-
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <div className="grid gap-4">
-          {/* Name */}
-          <div>
-            <label className={labelClass}>Название *</label>
-            <input name="name" value={form.name} onChange={handleChange} className={inputClass} placeholder="Перчатки х/б белые" required />
-          </div>
-
-          {/* Category */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Категория *</label>
-              <select name="categoryId" value={form.categoryId} onChange={handleChange} className={inputClass} required>
-                <option value="">— Выберите —</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Подкатегория</label>
-              <select 
-                name="subcategoryId" 
-                value={form.subcategoryId} 
-                onChange={handleChange} 
-                className={inputClass} 
-                disabled={!form.categoryId || subcategories.length === 0}
-              >
-                <option value="">— Нет —</option>
-                {subcategories.map((sc) => (
-                  <option key={sc.id} value={sc.id}>{sc.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* External ID */}
-          <div>
-            <label className={labelClass}>Артикул (external_id)</label>
-            <input name="externalId" value={form.externalId} onChange={handleChange} className={inputClass} placeholder="GLV-011" />
-          </div>
-
-          {/* Prices */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Цена без НДС (₸)</label>
-              <input name="priceWithoutVat" type="number" value={form.priceWithoutVat} onChange={handleChange} className={inputClass} placeholder="150" />
-            </div>
-            <div>
-              <label className={labelClass}>Цена с НДС (₸)</label>
-              <input name="priceWithVat" type="number" step="0.01" value={form.priceWithVat} onChange={handleChange} className={inputClass} placeholder="195" />
-            </div>
-          </div>
-
-          {/* Unit */}
-          <div>
-            <label className={labelClass}>Единица измерения</label>
-            <input name="unit" value={form.unit} onChange={handleChange} className={inputClass} placeholder="пара, шт, кг" />
-          </div>
-
-          {/* Package */}
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className={labelClass}>Тип фасовки</label>
-              <input name="packageType" value={form.packageType} onChange={handleChange} className={inputClass} placeholder="мешок" />
-            </div>
-            <div>
-              <label className={labelClass}>Кол-во в фасовке</label>
-              <input name="packageQuantity" type="number" value={form.packageQuantity} onChange={handleChange} className={inputClass} placeholder="600" />
-            </div>
-            <div>
-              <label className={labelClass}>Ед. фасовки</label>
-              <input name="packageUnit" value={form.packageUnit} onChange={handleChange} className={inputClass} placeholder="пар" />
-            </div>
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className={labelClass}>Описание</label>
-            <textarea name="description" value={form.description} onChange={handleChange} className={`${inputClass} min-h-[80px] resize-y`} placeholder="Описание товара..." />
-          </div>
-
-          {/* Photo Upload */}
-          <div>
-            <label className={labelClass}>Фото товара</label>
-            <input type="hidden" name="photo" value={form.photo} />
-            
-            <div className="flex gap-4 items-start">
-              <div 
-                className={`flex-1 border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors
-                  ${uploading ? 'bg-gray-50 border-gray-300' : 'border-gray-300 hover:border-accent hover:bg-accent/5 bg-white'}`}
-                onDrop={handleFileDrop}
-                onDragOver={handleDragOver}
-                onClick={() => document.getElementById('photo-upload')?.click()}
-              >
-                <input 
-                  id="photo-upload" 
-                  type="file" 
-                  accept="image/png, image/jpeg, image/jpg, image/webp" 
-                  className="hidden" 
-                  onChange={handleFileDrop} 
-                />
-                
-                {uploading ? (
-                  <div className="text-accent font-bold text-sm animate-pulse">Загрузка...</div>
-                ) : (
-                  <>
-                    <div className="text-gray-500 mb-1">
-                      Перетащите фото сюда
-                    </div>
-                    <div className="text-sm text-gray-400">или нажмите для загрузки</div>
-                  </>
-                )}
+    <div className="max-w-[900px]">
+      <div className="mb-6 flex items-center gap-3"><Link href={returnTo} className="text-gray-400"><ArrowLeft size={20} /></Link><h2 className="text-xl font-bold">{productId ? 'Редактирование товара' : 'Новый товар'}</h2></div>
+      <form onSubmit={submit} className="space-y-6 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
+        {(qualityIssues.length > 0 || reviewNote) && (
+          <section className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-center gap-2 font-black text-amber-950"><AlertTriangle size={19} /> Что нужно проверить</div>
+            {reviewNote && <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900"><strong>Комментарий менеджера:</strong> {reviewNote}</div>}
+            {qualityIssues.map((qualityIssue) => (
+              <div key={qualityIssue.code} className={`rounded-xl border p-3 text-sm ${qualityIssue.severity === 'error' ? 'border-red-200 bg-red-50 text-red-900' : 'border-amber-200 bg-white text-amber-900'}`}>
+                <strong>{qualityIssue.title}</strong><div className="mt-0.5 text-xs opacity-80">{qualityIssue.details}</div>
               </div>
-
-              {form.photo && (
-                <div className="w-[100px] h-[100px] shrink-0 rounded-xl border border-gray-200 overflow-hidden bg-gray-50 relative group">
-                  <img src={form.photo} alt="Preview" className="w-full h-full object-contain" />
-                  <button 
-                    type="button"
-                    onClick={() => setForm(prev => ({ ...prev, photo: '' }))}
-                    className="absolute inset-0 bg-black/50 text-white font-bold opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
-                  >
-                    Удалить
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Sort + Active */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Порядок сортировки</label>
-              <input name="sortOrder" type="number" value={form.sortOrder} onChange={handleChange} className={inputClass} placeholder="1" />
-            </div>
-            <div className="flex items-end pb-1">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="isActive"
-                  checked={form.isActive}
-                  onChange={handleChange}
-                  className="w-5 h-5 rounded border-gray-300 text-accent focus:ring-accent"
-                />
-                <span className="text-sm font-bold text-gray-700">Активен (показывать в каталоге)</span>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        {/* Messages */}
-        {error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm font-medium">{error}</div>
+            ))}
+            <p className="text-xs text-amber-800">После сохранения очередь пересчитается автоматически. Если замечания устранены, товар исчезнет из списка проверки.</p>
+          </section>
         )}
-        {success && (
-          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-xl text-green-600 text-sm font-medium">{success}</div>
-        )}
+        <section className="grid gap-4">
+          <h3 className="font-black">Основное</h3>
+          <div><label className={label}>Название *</label><input name="name" value={form.name} onChange={change} className={input} required /></div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div><label className={label}>URL (slug)</label><input name="slug" value={form.slug} onChange={change} className={input} placeholder="создаётся автоматически" /></div>
+            <div><label className={label}>Артикул</label><input name="externalId" value={form.externalId} onChange={change} className={input} /></div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div><label className={label}>Категория *</label><select name="categoryId" value={form.categoryId} onChange={change} className={input} required><option value="">— Выберите —</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
+            <div><label className={label}>Подкатегория</label><select name="subcategoryId" value={form.subcategoryId} onChange={change} className={input} disabled={!selectedCategory?.subcategories?.length}><option value="">— Нет —</option>{selectedCategory?.subcategories?.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
+          </div>
+        </section>
 
-        {/* Submit */}
-        <button
-          type="submit"
-          disabled={saving}
-          className="mt-5 w-full h-[48px] rounded-xl bg-accent hover:bg-accent-dark disabled:opacity-50 text-white font-bold text-sm flex items-center justify-center gap-2 transition-colors"
-        >
-          {saving ? 'Сохранение...' : <><Save size={16} />{isEditing ? 'Сохранить изменения' : 'Добавить товар'}</>}
-        </button>
+        <section className="grid gap-4 rounded-2xl bg-blue-50 p-4">
+          <div><h3 className="font-black text-blue-950">Цена и оптовая упаковка</h3><p className="text-xs text-blue-700">На сайте показывается только цена с НДС. Корзина считает упаковками.</p></div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div><label className={label}>Цена за единицу с НДС, ₸ *</label><input name="priceWithVat" type="number" min="0" step="1" value={form.priceWithVat} onChange={change} className={input} /><p className="mt-1 text-xs text-blue-700">Дробная цена при сохранении округляется вверх.</p></div>
+            <div><label className={label}>Единица цены *</label><input name="unitName" value={form.unitName} onChange={change} className={input} placeholder="шт, пара, рулон" /></div>
+            <div><label className={label}>Тип упаковки *</label><input name="packageType" value={form.packageType} onChange={change} className={input} placeholder="коробка, мешок" /></div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div><label className={label}>Единиц в упаковке *</label><input name="unitsPerPackage" type="number" min="1" value={form.unitsPerPackage} onChange={change} className={input} /></div>
+            <div><label className={label}>Подпись количества</label><input name="packageUnit" value={form.packageUnit} onChange={change} className={input} placeholder="шт, пар" /></div>
+            <div><label className={label}>Минимум упаковок</label><input name="minOrderPackages" type="number" min="1" value={form.minOrderPackages} onChange={change} className={input} /></div>
+          </div>
+          {Number(form.priceWithVat) > 0 && Number(form.unitsPerPackage) > 0 && <div className="text-sm font-black text-blue-950">Цена упаковки: {(Math.ceil(Number(form.priceWithVat)) * Number(form.unitsPerPackage)).toLocaleString('ru-RU')} ₸ с НДС</div>}
+        </section>
+
+        <section className="grid gap-4">
+          <h3 className="font-black">Описание и характеристики</h3>
+          <div><label className={label}>Короткое описание</label><textarea name="shortDescription" value={form.shortDescription} onChange={change} className={`${input} min-h-20`} /></div>
+          <div><label className={label}>Полное описание</label><textarea name="fullDescription" value={form.fullDescription} onChange={change} className={`${input} min-h-32`} /></div>
+          <div><label className={label}>Характеристики</label><textarea name="characteristics" value={form.characteristics} onChange={change} className={`${input} min-h-28 font-mono`} placeholder={'Материал: уточнить\nЦвет: белый'} /><p className="mt-1 text-xs text-gray-400">Одна строка — «Название: значение». Неизвестные факты оставляйте пустыми или пишите «уточнить».</p></div>
+          <div className="grid gap-4 sm:grid-cols-2"><div><label className={label}>Поисковые слова</label><textarea name="searchKeywords" value={form.searchKeywords} onChange={change} className={`${input} min-h-20`} /></div><div><label className={label}>Подсказка покупателю</label><textarea name="buyerHint" value={form.buyerHint} onChange={change} className={`${input} min-h-20`} /></div></div>
+        </section>
+
+        <section className="grid gap-4">
+          <h3 className="font-black">Фото</h3>
+          <div className="flex flex-col gap-4 sm:flex-row">
+            <div className="flex-1"><label className={label}>URL изображения</label><input name="imageUrl" value={form.imageUrl} onChange={change} className={input} /></div>
+            {form.imageUrl && <img src={form.imageUrl} alt="Предпросмотр" className="h-24 w-24 rounded-xl border object-contain" />}
+          </div>
+          <div onDragOver={(event) => event.preventDefault()} onDrop={upload} onClick={() => document.getElementById('product-image')?.click()} className="cursor-pointer rounded-xl border-2 border-dashed p-5 text-center text-sm text-gray-500 hover:border-accent"><input id="product-image" type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={upload} />{uploading ? 'Загрузка...' : 'Перетащите фото или нажмите для выбора'}</div>
+        </section>
+
+        <section className="grid gap-4">
+          <h3 className="font-black">Meta и сортировка</h3>
+          <div className="grid gap-4 sm:grid-cols-2"><div><label className={label}>Meta Catalog ID</label><input name="metaCatalogId" value={form.metaCatalogId} onChange={change} className={input} placeholder="по умолчанию равен slug" /></div><div><label className={label}>Бренд</label><input name="brand" value={form.brand} onChange={change} className={input} /></div></div>
+          <div className="grid gap-4 sm:grid-cols-2"><div><label className={label}>Google product category</label><input name="googleProductCategory" value={form.googleProductCategory} onChange={change} className={input} /></div><div><label className={label}>Facebook product category</label><input name="fbProductCategory" value={form.fbProductCategory} onChange={change} className={input} /></div></div>
+          <div><label className={label}>Порядок сортировки</label><input name="sortOrder" type="number" value={form.sortOrder} onChange={change} className={input} /></div>
+          <div className="flex flex-wrap gap-6"><label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" name="isFeatured" checked={form.isFeatured} onChange={change} className="h-5 w-5" />Популярный товар</label><label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" name="isActive" checked={form.isActive} onChange={change} className="h-5 w-5" />Показывать в каталоге</label></div>
+        </section>
+
+        {publicationErrors.length > 0 && <div className="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"><AlertTriangle className="shrink-0" size={18} /><span>Для публикации заполните: {publicationErrors.join(', ')}. Сохранить черновик можно с выключенным показом.</span></div>}
+        {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+        <button type="submit" disabled={saving} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent font-bold text-white disabled:opacity-50"><Save size={17} />{saving ? 'Сохранение...' : 'Сохранить товар'}</button>
       </form>
     </div>
   );
 }
 
 export default function ProductForm(props: ProductFormProps) {
-  return (
-    <Suspense fallback={<div className="text-gray-400 font-bold animate-pulse py-20 text-center">Загрузка...</div>}>
-      <ProductFormInner {...props} />
-    </Suspense>
-  );
+  return <Suspense fallback={<div className="py-20 text-center text-gray-400">Загрузка...</div>}><ProductFormInner {...props} /></Suspense>;
 }

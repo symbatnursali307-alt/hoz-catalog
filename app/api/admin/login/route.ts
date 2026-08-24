@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { login, password } = body;
 
-    if (!login || !password) {
+    if (typeof login !== 'string' || typeof password !== 'string' || !login.trim() || !password) {
       return NextResponse.json(
         { success: false, error: 'Логин и пароль обязательны' },
         { status: 400 }

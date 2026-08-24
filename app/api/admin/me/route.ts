@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifySession } from '@/lib/admin-auth';
+import { isAdminOrdersVisible } from '@/lib/admin-features';
 
 export async function GET() {
   const isValid = await verifySession();
@@ -11,5 +12,8 @@ export async function GET() {
     );
   }
 
-  return NextResponse.json({ authenticated: true });
+  return NextResponse.json({
+    authenticated: true,
+    features: { ordersVisible: isAdminOrdersVisible() },
+  });
 }

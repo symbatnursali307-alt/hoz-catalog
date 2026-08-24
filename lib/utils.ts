@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { roundPriceUp } from "@/lib/pricing";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -7,8 +8,8 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatPrice(value: number) {
   return new Intl.NumberFormat("ru-RU", {
-    maximumFractionDigits: 2
-  }).format(value) + " ₸";
+    maximumFractionDigits: 0
+  }).format(roundPriceUp(value)) + " ₸";
 }
 
 export function formatPackageCount(count: number, packageType?: string) {

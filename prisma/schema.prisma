@@ -8,49 +8,57 @@ datasource db {
 }
 
 model Category {
-  id        String   @id @default(cuid())
-  slug      String   @unique
+  id        String  @id @default(cuid())
+  slug      String  @unique
   name      String
-  sortOrder Int      @default(0)
-  isActive  Boolean  @default(true)
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  subcategories Subcategory[]
-  products      Product[]
+  subcategories   Subcategory[]
+  products        Product[]
+  analyticsEvents AnalyticsEvent[]
 }
 
 model Subcategory {
-  id         String   @id @default(cuid())
-  slug       String   @unique
-  name       String
-  sortOrder  Int      @default(0)
-  isActive   Boolean  @default(true)
+  id        String  @id @default(cuid())
+  slug      String  @unique
+  name      String
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
 
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
 
-  products   Product[]
+  products Product[]
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Product {
-  id          String   @id @default(cuid())
-  externalId  String?  @unique
+  id         String  @id @default(cuid())
+  externalId String? @unique
+  slug       String  @unique
 
-  categoryId  String
-  category    Category @relation(fields: [categoryId], references: [id])
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
 
   subcategoryId String?
   subcategory   Subcategory? @relation(fields: [subcategoryId], references: [id])
 
-  name        String
-  description String?
-  unit        String?
+  name             String
+  description      String?
+  shortDescription String?
+  fullDescription  String? @db.Text
+  characteristics  Json?
+  searchKeywords   String?
+  buyerHint        String?
 
+  // Legacy fields are retained while the restored catalog is normalized.
+  unit            String?
   priceWithoutVat Int?
   priceWithVat    Float?
   price           String?
@@ -58,24 +66,51 @@ model Product {
   packageType     String?
   packageQuantity Int?
   packageUnit     String?
+  photo           String?
 
-  photo       String?
+  // Canonical B2B catalog fields.
+  unitName              String?
+  unitsPerPackage       Int?
+  minOrderPackages      Int     @default(1)
+  imageUrl              String?
+  isFeatured            Boolean @default(false)
+  metaCatalogId         String? @unique
+  brand                 String?
+  googleProductCategory String?
+  fbProductCategory     String?
 
-  sortOrder   Int      @default(0)
-  isActive    Boolean  @default(true)
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  selectedBy  ClientSelectedProduct[]
+  selectedBy      ClientSelectedProduct[]
+  analyticsEvents AnalyticsEvent[]
+  review           ProductReview?
+}
+
+model ProductReview {
+  id        String @id @default(cuid())
+  productId String @unique
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  status String @default("PENDING")
+  note   String? @db.Text
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  resolvedAt DateTime?
+
+  @@index([status, updatedAt])
 }
 
 model Client {
-  id          String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  name        String
-  city        String
-  phone       String
+  name  String
+  city  String
+  phone String
 
   source      String?
   utmSource   String?
@@ -84,35 +119,143 @@ model Client {
   utmContent  String?
   utmTerm     String?
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   selectedProducts ClientSelectedProduct[]
 }
 
 model ClientSelectedProduct {
-  id                  String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  clientId            String
-  client              Client   @relation(fields: [clientId], references: [id])
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id])
 
-  productId           String?
-  product             Product? @relation(fields: [productId], references: [id])
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
 
   productNameSnapshot String
 
-  createdAt           DateTime @default(now())
+  createdAt DateTime @default(now())
+}
+
+model Manager {
+  id            String  @id @default(cuid())
+  name          String
+  slug          String  @unique
+  whatsappPhone String
+  isActive      Boolean @default(true)
+  isDefault     Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cartSubmissions CartSubmission[]
+  analyticsEvents AnalyticsEvent[]
+
+  @@index([isActive, isDefault])
+}
+
+model CartSubmission {
+  id       String @id @default(cuid())
+  publicId String @unique
+
+  // Human-facing sequence and an unguessable token for the private order page.
+  orderNumber Int    @unique @default(autoincrement())
+  accessToken String @unique
+  // A browser checkout attempt can safely be retried without creating a duplicate.
+  idempotencyKey String? @unique
+
+  visitorId String
+  sessionId String
+
+  managerId String?
+  manager   Manager? @relation(fields: [managerId], references: [id], onDelete: SetNull)
+
+  phone        String
+  customerName String?
+  items        Json
+  itemCount    Int
+  totalAmount  Float
+  whatsappText String  @db.Text
+
+  // Keep old orders useful after a manager is renamed, disabled or removed.
+  managerNameSnapshot  String?
+  managerPhoneSnapshot String?
+
+  source      String?
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmContent  String?
+  utmTerm     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([managerId, createdAt])
+  @@index([visitorId])
+  @@index([sessionId])
+}
+
+model AnalyticsEvent {
+  id        String @id @default(cuid())
+  eventId   String @unique
+  eventName String
+
+  visitorId String
+  sessionId String
+
+  managerId String?
+  manager   Manager? @relation(fields: [managerId], references: [id], onDelete: SetNull)
+
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  phoneHash  String?
+  cartTotal  Float?
+  itemsCount Int?
+
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmContent  String?
+
+  metadata  Json?
+  isTest    Boolean @default(false)
+  ipHash    String?
+  userAgent String? @db.Text
+  fbp       String?
+  fbc       String?
+
+  metaEventName String?
+  metaSentAt    DateTime?
+  metaError     String?   @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@index([eventName, createdAt])
+  @@index([productId, eventName, createdAt])
+  @@index([categoryId, eventName, createdAt])
+  @@index([managerId, eventName, createdAt])
+  @@index([visitorId, createdAt])
+  @@index([sessionId, createdAt])
 }
 
 model AppSettings {
-  id                 String   @id @default("default")
+  id String @id @default("default")
 
-  companyName        String   @default("Каталог хозтоваров")
-  catalogTitle       String   @default("Каталог хозтоваров")
+  companyName        String  @default("Каталог хозтоваров")
+  catalogTitle       String  @default("Каталог хозтоваров")
   catalogDescription String?
 
-  whatsappPhone      String?
-  showPrices         Boolean  @default(true)
-  showVatPrices      Boolean  @default(true)
+  whatsappPhone String?
+  showPrices    Boolean @default(true)
+  showVatPrices Boolean @default(true)
+  cartEnabled   Boolean @default(false)
 
-  updatedAt          DateTime @updatedAt
+  updatedAt DateTime @updatedAt
 }

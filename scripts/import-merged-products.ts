@@ -183,6 +183,7 @@ async function main() {
 
     const data = {
       externalId,
+      slug: makeSlug(externalId, `product-${index + 1}`),
       categoryId: category.id,
       subcategoryId,
       name: row.name?.trim() || externalId,

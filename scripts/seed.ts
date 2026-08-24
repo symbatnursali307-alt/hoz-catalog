@@ -48,6 +48,7 @@ async function main() {
       },
       create: {
         externalId: prod.id,
+        slug: prod.id.toLowerCase().replace(/[^a-z0-9-]+/g, '-'),
         categoryId: categoryId,
         name: prod.name,
         description: prod.desc,

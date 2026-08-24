@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import PwaInstallButton from '@/components/pwa/PwaInstallButton';
 import {
   LayoutDashboard,
   Package,
@@ -12,6 +13,10 @@ import {
   ImageIcon,
   Users,
   Settings,
+  MessageCircle,
+  ClipboardList,
+  BarChart3,
+  ShieldAlert,
   LogOut,
   Menu,
   X,
@@ -20,11 +25,15 @@ import {
 const navItems = [
   { href: '/admin', label: 'Дашборд', icon: LayoutDashboard },
   { href: '/admin/products', label: 'Товары', icon: Package },
+  { href: '/admin/product-review', label: 'Проверка данных', icon: ShieldAlert },
   { href: '/admin/products/new', label: 'Добавить товар', icon: PlusCircle },
   { href: '/admin/import', label: 'Импорт', icon: Upload },
   { href: '/admin/categories', label: 'Категории', icon: FolderTree },
   { href: '/admin/images', label: 'Фото', icon: ImageIcon },
   { href: '/admin/clients', label: 'Клиенты', icon: Users },
+  { href: '/admin/cart-submissions', label: 'Заказы', icon: ClipboardList },
+  { href: '/admin/managers', label: 'Менеджеры', icon: MessageCircle },
+  { href: '/admin/reports', label: 'Аналитика', icon: BarChart3 },
   { href: '/admin/settings', label: 'Настройки', icon: Settings },
 ];
 
@@ -32,7 +41,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [ordersVisible, setOrdersVisible] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const visibleNavItems = navItems.filter(
+    (item) => ordersVisible || item.href !== '/admin/cart-submissions',
+  );
 
   useEffect(() => {
     // Don't check auth on login page
@@ -42,10 +56,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
 
     fetch('/api/admin/me')
-      .then((res) => {
+      .then(async (res) => {
         if (!res.ok) {
           router.replace('/admin/login');
         } else {
+          const data = await res.json();
+          setOrdersVisible(data.features?.ordersVisible === true);
           setAuthed(true);
         }
       })
@@ -103,7 +119,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         <nav className="flex-1 overflow-y-auto p-3">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = pathname === item.href || 
               (item.href !== '/admin' && pathname.startsWith(item.href));
             const Icon = item.icon;
@@ -148,8 +164,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Menu size={24} />
           </button>
           <h1 className="text-lg font-bold text-gray-900 truncate">
-            {navItems.find((i) => i.href === pathname)?.label || 'Админ-панель'}
+            {visibleNavItems.find((i) => i.href === pathname)?.label || 'Админ-панель'}
           </h1>
+          <div className="ml-auto">
+            <PwaInstallButton source="admin_header" />
+          </div>
         </header>
 
         {/* Page content */}

@@ -41,6 +41,27 @@ export async function PUT(request: NextRequest) {
   try {
     const data = await request.json();
 
+    if (data.cartEnabled === true) {
+      const [managers, orderableProducts] = await Promise.all([
+        prisma.manager.count({ where: { isActive: true } }),
+        prisma.product.count({
+          where: {
+            isActive: true,
+            priceWithVat: { gt: 0 },
+            unitName: { not: null },
+            packageType: { not: null },
+            unitsPerPackage: { gt: 0 },
+          },
+        }),
+      ]);
+      if (!managers || !orderableProducts) {
+        return NextResponse.json(
+          { success: false, error: 'Для включения корзины нужен активный менеджер и хотя бы один полностью заполненный активный товар' },
+          { status: 409 },
+        );
+      }
+    }
+
     const settings = await prisma.appSettings.upsert({
       where: { id: DEFAULT_ID },
       update: {
@@ -49,7 +70,8 @@ export async function PUT(request: NextRequest) {
         catalogDescription: data.catalogDescription || null,
         whatsappPhone: data.whatsappPhone || null,
         showPrices: data.showPrices ?? true,
-        showVatPrices: data.showVatPrices ?? true,
+        showVatPrices: true,
+        cartEnabled: data.cartEnabled === true,
       },
       create: {
         id: DEFAULT_ID,
@@ -58,7 +80,8 @@ export async function PUT(request: NextRequest) {
         catalogDescription: data.catalogDescription || null,
         whatsappPhone: data.whatsappPhone || null,
         showPrices: data.showPrices ?? true,
-        showVatPrices: data.showVatPrices ?? true,
+        showVatPrices: true,
+        cartEnabled: data.cartEnabled === true,
       },
     });
 

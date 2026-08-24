@@ -99,6 +99,7 @@ async function importProduct(row: ProductRow, index: number) {
   const data = {
     name: row.name.trim(),
     externalId,
+    slug: makeSlug(externalId || row.name),
     categoryId: category.id,
     
     priceWithoutVat,

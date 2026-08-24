@@ -15,19 +15,29 @@ function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-// In-memory session store (sufficient for single-admin MVP)
-// On Vercel serverless, each invocation is isolated, so we use a signed cookie approach instead
-const COOKIE_SECRET = process.env.ADMIN_SECRET || 'fallback-secret-key';
+function cookieSecret() {
+  return process.env.ADMIN_SECRET || '';
+}
+
+function equalSecret(left: string, right: string) {
+  const a = Buffer.from(left);
+  const b = Buffer.from(right);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 
 function signValue(value: string): string {
+  const secret = cookieSecret();
+  if (secret.length < 32) throw new Error('ADMIN_SECRET должен содержать минимум 32 символа');
   const signature = crypto
-    .createHmac('sha256', COOKIE_SECRET)
+    .createHmac('sha256', secret)
     .update(value)
     .digest('hex');
   return `${value}.${signature}`;
 }
 
 function verifySignedValue(signed: string): string | null {
+  const secret = cookieSecret();
+  if (secret.length < 32) return null;
   const lastDot = signed.lastIndexOf('.');
   if (lastDot === -1) return null;
 
@@ -35,21 +45,27 @@ function verifySignedValue(signed: string): string | null {
   const signature = signed.substring(lastDot + 1);
 
   const expected = crypto
-    .createHmac('sha256', COOKIE_SECRET)
+    .createHmac('sha256', secret)
     .update(value)
     .digest('hex');
 
-  if (signature !== expected) return null;
+  if (!equalSecret(signature, expected)) return null;
   return value;
 }
 
 export function checkCredentials(login: string, password: string): boolean {
-  const envLogin = process.env.ADMIN_LOGIN;
-  const envPassword = process.env.ADMIN_PASSWORD;
+  if (typeof login !== 'string' || typeof password !== 'string') return false;
 
-  if (!envLogin || !envPassword) return false;
+  const credentials = [
+    [process.env.ADMIN_LOGIN, process.env.ADMIN_PASSWORD],
+    [process.env.ADMIN_ADDITIONAL_LOGIN, process.env.ADMIN_ADDITIONAL_PASSWORD],
+  ];
 
-  return login === envLogin && password === envPassword;
+  return credentials.some(([envLogin, envPassword]) => (
+    Boolean(envLogin && envPassword)
+    && equalSecret(login.trim(), envLogin!.trim())
+    && equalSecret(password, envPassword!)
+  ));
 }
 
 export async function createSession(): Promise<void> {
@@ -91,7 +107,7 @@ export async function checkAdminAuth(request?: NextRequest): Promise<boolean> {
   if (request) {
     const secret = request.headers.get('x-admin-secret');
     const envSecret = process.env.ADMIN_SECRET;
-    if (envSecret && secret === envSecret) return true;
+    if (envSecret && secret && equalSecret(secret, envSecret)) return true;
   }
 
   return false;

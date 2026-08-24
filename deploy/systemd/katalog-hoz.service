@@ -1,0 +1,27 @@
+[Unit]
+Description=Katalog Hoz Next.js application
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kataloghoz
+Group=kataloghoz
+WorkingDirectory=/srv/katalog-hoz/current
+Environment=NODE_ENV=production
+Environment=PORT=3000
+EnvironmentFile=/etc/katalog-hoz.env
+ExecStart=/usr/bin/npm start -- --hostname 127.0.0.1
+Restart=always
+RestartSec=5
+TimeoutStartSec=90
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

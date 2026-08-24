@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
-import { calculatePriceWithVat, VAT_RATE } from "../lib/pricing";
+import { calculatePriceWithVat } from "../lib/pricing";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config();
@@ -36,7 +36,7 @@ async function main() {
 
   console.log(JSON.stringify({
     mode: SHOULD_APPLY ? "apply" : "dry-run",
-    vatRate: VAT_RATE,
+    note: "Автоматический расчёт НДС отключён: цена с НДС должна быть импортирована явно",
     checked: products.length,
     needsUpdate: updates.length,
     sample: updates.slice(0, 10).map((product) => ({
